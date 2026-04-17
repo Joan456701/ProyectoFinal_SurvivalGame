@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 077164640ced4bb478e078deb107685b, type: 3}
+  m_Name: Pared
+  m_EditorClassIdentifier: Assembly-CSharp::BuildingPieceSO
+  nameString: Pared
+  prefab: {fileID: 4185301216528561379, guid: 5fddb63b0894d6e45a22c7419fdab0e2, type: 3}
+  ghostPrefab: {fileID: 0}
+  whith: 1
+  hieght: 1

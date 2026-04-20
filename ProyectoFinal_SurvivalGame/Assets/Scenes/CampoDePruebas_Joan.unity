@@ -217,7 +217,12 @@ MonoBehaviour:
   _mainCamera: {fileID: 330585545}
   _pInputHandler: {fileID: 1746522192}
   _currentBuilding: {fileID: 11400000, guid: 83ce5886de0c37c43acc9e531561f81a, type: 2}
+  _currentWallBuilding: {fileID: 11400000, guid: 6d9fbe94d238b9c4b8363aee294cc94d, type: 2}
   _raycastDistance: 10
+  _edgeLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  _wallMode: 0
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -928,7 +933,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: c22777d6e868e4f2fb421913386b154e, type: 2}
+  - {fileID: 2100000, guid: 2f00ab689a13cf9408b61e62e452dbd5, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1336,6 +1341,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1416962595
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1416962597}
+  - component: {fileID: 1416962596}
+  m_Layer: 0
+  m_Name: GridManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1416962596
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1416962595}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e15d8440dd8feb41972c82598c86536, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridManager
+  _width: 10
+  _height: 10
+  _cellSize: 3
+--- !u!4 &1416962597
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1416962595}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1746522191
 GameObject:
   m_ObjectHideFlags: 0
@@ -1365,6 +1417,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62c926d108015fc488314af9a18d6cc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInputHandler
+  rotateTriggered: 0
 --- !u!4 &1746522193
 Transform:
   m_ObjectHideFlags: 0
@@ -1397,7 +1450,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1808140131
 Transform:
   m_ObjectHideFlags: 0
@@ -1581,7 +1634,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1847783801
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1783,3 +1836,4 @@ SceneRoots:
   - {fileID: 1847783805}
   - {fileID: 449763254}
   - {fileID: 1057609917}
+  - {fileID: 1416962597}

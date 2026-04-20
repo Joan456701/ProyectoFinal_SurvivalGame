@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be4c5f330f2b717408c339b3cbd80a8a, type: 3}
+  m_Name: Wall
+  m_EditorClassIdentifier: Assembly-CSharp::FloorEdgeObjectTypeSO
+  prefab: {fileID: 1570065366218377110, guid: 0fda9d88214b233478ad91d3ce52d182, type: 3}
+  ghostPrefab: {fileID: 1570065366218377110, guid: a436feb50c3073b4eb739f41db22d27f, type: 3}

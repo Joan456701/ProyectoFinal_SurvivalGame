@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 077164640ced4bb478e078deb107685b, type: 3}
-  m_Name: Pared
+  m_Name: Floor
   m_EditorClassIdentifier: Assembly-CSharp::BuildingPieceSO
-  nameString: Pared
-  prefab: {fileID: 4185301216528561379, guid: 5fddb63b0894d6e45a22c7419fdab0e2, type: 3}
-  ghostPrefab: {fileID: 0}
+  nameString: Floor
+  prefab: {fileID: 4441437744188099715, guid: 23dd389fe94d629498b1e98c9d09d12d, type: 3}
+  ghostPrefab: {fileID: 4441437744188099715, guid: a2678c59d503faf4d87b866319e5ee39, type: 3}
   whith: 1
   hieght: 1

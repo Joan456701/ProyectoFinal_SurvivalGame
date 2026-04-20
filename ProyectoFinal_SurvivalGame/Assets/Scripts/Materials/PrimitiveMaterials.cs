@@ -26,11 +26,6 @@ public class PrimitiveMaterials : MonoBehaviour, IDamagable
     {
         _currentHealth = _maxHealth;
     }
-
-    void Update()
-    {
-        Debug.Log("Vida actual: " + _currentHealth);
-    }
     public void DamageRecived(int damge)
     {
         _currentHealth -= damge;

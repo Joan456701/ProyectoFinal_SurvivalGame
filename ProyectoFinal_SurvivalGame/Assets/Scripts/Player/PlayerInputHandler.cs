@@ -3,11 +3,7 @@ using UnityEngine.InputSystem;
 
 public class PlayerInputHandler : MonoBehaviour
 {
-    // Referencia a la clase que Unity acaba de generar por ti
     private PlayerInput _playerControls;
-
-    // Estas son las variables públicas que el creador del tutorial crea en el minuto 06:55
-    // Las dejamos exactamente igual para que su FirstPersonController pueda leerlas
     public Vector2 movementInput { get; private set; }
     public Vector2 rotationInput { get; private set; }
     public bool jumpTriggered { get; private set; }
@@ -15,6 +11,10 @@ public class PlayerInputHandler : MonoBehaviour
     public bool interactTriggered { get; private set; }
     public bool attackTiggered { get; private set; }
     public bool isBuildMode {  get; private set; } = false;
+    public bool destroyTriggered { get; private set; }
+    
+    public bool rotateTriggered;
+
     private void Awake()
     {
         // Inicializacion de los controles
@@ -46,6 +46,14 @@ public class PlayerInputHandler : MonoBehaviour
 
         // --- Build ---
         _playerControls.Player.Build.performed += inputInfo => isBuildMode = !isBuildMode;
+
+        // --- Provisional Destroy ---
+        _playerControls.Player.DestroyProbisional.performed += inputInfo => destroyTriggered = true;
+        _playerControls.Player.DestroyProbisional.canceled += inputInfo => destroyTriggered = false;
+
+        // --- Rotate Objects ---
+        _playerControls.Player.Rotate.performed += inputInfo => rotateTriggered = true;
+        _playerControls.Player.Rotate.canceled += inputInfo => rotateTriggered = false;
     }
 
     private void OnEnable()

@@ -19,6 +19,7 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private CharacterController _characterController;
     [SerializeField] private Camera _mainCamera;
     [SerializeField] private PlayerInputHandler _pInputHandler;
+    [SerializeField] private SceneInventoryController _inventoryController;
 
     [Header("Interaction")]
     [SerializeField] private float _raycastDistance;
@@ -29,6 +30,11 @@ public class FirstPersonController : MonoBehaviour
     private float _currentSpeed => _walkSpeed * (_pInputHandler.sprintTriggered ? _sprintMultiplier : 1f);
     void Start()
     {
+        if (_inventoryController == null)
+        {
+            _inventoryController = FindFirstObjectByType<SceneInventoryController>();
+        }
+
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -38,6 +44,7 @@ public class FirstPersonController : MonoBehaviour
         //DrawRaycast();
         HandleMovement();
         HandleRotation();
+        UpdatePickupPrompt();
 
         if (_pInputHandler.interactTriggered)
         {
@@ -47,7 +54,12 @@ public class FirstPersonController : MonoBehaviour
 
             if (Physics.Raycast(origin, direction, out hitInfo, _raycastDistance))
             {
-               
+                IPickupable pickupItem = hitInfo.collider.GetComponent<IPickupable>();
+
+                if (pickupItem != null)
+                {
+                    pickupItem.TryPickup(_inventoryController);
+                }
             }
         }
 
@@ -68,6 +80,30 @@ public class FirstPersonController : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void UpdatePickupPrompt()
+    {
+        if (_inventoryController == null)
+        {
+            return;
+        }
+
+        Vector3 origin = _mainCamera.transform.position;
+        Vector3 direction = _mainCamera.transform.forward;
+
+        if (Physics.Raycast(origin, direction, out RaycastHit pickupHitInfo, _raycastDistance))
+        {
+            IPickupable pickupItem = pickupHitInfo.collider.GetComponent<IPickupable>();
+
+            if (pickupItem != null)
+            {
+                _inventoryController.SetPickupPrompt(true, pickupItem.GetPickupPrompt());
+                return;
+            }
+        }
+
+        _inventoryController.SetPickupPrompt(false, string.Empty);
     }
 
     private Vector3 CalculateWorldDircetion()

@@ -446,6 +446,7 @@ public class SceneInventoryController : MonoBehaviour
         RegisterItem("luminous_resin", "Resina luminosa", "Compuesto organico con brillo natural. Puede servir mas adelante para antorchas y adhesivos.", new Color(0.3f, 0.95f, 1f), 15, PrimitiveType.Sphere, new Vector3(0.55f, 0.55f, 0.55f));
         RegisterItem("purified_water", "Agua purificada", "Suministro basico de supervivencia. Conviene reservarla para expediciones largas.", new Color(0.45f, 0.7f, 1f), 10, PrimitiveType.Cylinder, new Vector3(0.45f, 0.6f, 0.45f));
         RegisterItem("dehydrated_food", "Comida deshidratada", "Racion compacta y duradera. Buena para mantener recursos siempre a mano.", new Color(1f, 0.68f, 0.28f), 10, PrimitiveType.Cylinder, new Vector3(0.5f, 0.25f, 0.5f));
+        RegisterItem("Bombona", "Bombona de oxigeno", "Tanque de oxigeno. Se acabara el tiempo, moriras.", new Color(0.2f, 0.8f, 1f), 1, PrimitiveType.Capsule, new Vector3(0.3f, 0.6f, 0.3f));
     }
 
     private void RegisterItem(string itemId, string displayName, string description, Color color, int maxStack, PrimitiveType worldPrimitiveType, Vector3 worldScale)
@@ -891,10 +892,19 @@ public class SceneInventoryController : MonoBehaviour
 
         if (_heldItemId == selectedSlot.item.itemId)
         {
+            if (selectedSlot.item.itemId == "Bombona")
+            {
+                OxygenSystem.Instance?.SetPaused(true);
+            }
             ClearHeldItemVisual();
             Debug.Log("Has quitado " + selectedSlot.item.displayName + " de la mano");
             RefreshUI();
             return;
+        }
+
+        if (selectedSlot.item.itemId == "Bombona")
+        {
+            OxygenSystem.Instance?.GiveOxygenTank();
         }
 
         SaveUndoState();

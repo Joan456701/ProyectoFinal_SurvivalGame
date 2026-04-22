@@ -26,7 +26,16 @@ public class ScenePickupItem : MonoBehaviour, IPickupable
             return false;
         }
 
-        Debug.Log("Has recogido " + _amount + " " + _pickupName);
+        if (_inventoryItemId == "Bombona" && OxygenSystem.Instance != null)
+        {
+            OxygenSystem.Instance.GiveOxygenTank();
+            Debug.Log("Has recogido la bombona de oxigeno. El tiempo de oxigeno ha comenzado!");
+        }
+        else
+        {
+            Debug.Log("Has recogido " + _amount + " " + _pickupName);
+        }
+
         Destroy(gameObject);
         return true;
     }

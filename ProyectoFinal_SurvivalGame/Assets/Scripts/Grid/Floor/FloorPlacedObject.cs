@@ -2,7 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
-public class FloorPlacedObject : MonoBehaviour
+public class FloorPlacedObject : MonoBehaviour, IDamagable
 {
     //Las 4 direcciones
     public enum Edge
@@ -19,6 +19,10 @@ public class FloorPlacedObject : MonoBehaviour
     [SerializeField] private FloorEdgePosition _leftFloorEdgePosition;
     [SerializeField] private FloorEdgePosition _rightFloorEdgePosition;
 
+    [Header("Vida Estructura")]
+    [SerializeField] private int _maxHealth;
+    private int _health;
+
     // Memoria interna guarda el muro real que esta construido en cada lado
     private FloorEdgePlacedObject _upEdgeObject;
     private FloorEdgePlacedObject _downEdgeObject;
@@ -32,6 +36,8 @@ public class FloorPlacedObject : MonoBehaviour
         CheckNeighborForWall(Edge.Down);
         CheckNeighborForWall(Edge.Left);
         CheckNeighborForWall(Edge.Right);
+
+        _health = _maxHealth;
     }
 
     // Función para mirar si el vecin ya ha colocado el muro
@@ -52,6 +58,14 @@ public class FloorPlacedObject : MonoBehaviour
             if (existingWall != null)
                 SetFloorPlacedObjects(edge, existingWall);
         }
+    }
+
+    public void DamageRecived(int damage)
+    {
+        _health -= damage;
+
+        if (_health <= 0)
+            Destroy(gameObject);
     }
 
     // Construye un muro nuevo en un borde y avisa al vecino

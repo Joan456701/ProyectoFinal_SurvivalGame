@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 293665046}
   - component: {fileID: 293665048}
   - component: {fileID: 293665049}
+  - component: {fileID: 293665050}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -192,15 +193,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8944720ae7ff864bbc51ac87e3d354e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FirstPersonController
-  _walkSpeed: 3
-  _sprintMultiplier: 2
+  _walkSpeed: 5
+  _sprintMultiplier: 1.5
   _jumpForce: 5
   _gravityMultiplier: 1
   _mouseSensitivity: 0.1
   _upDownLookRange: 80
   _characterController: {fileID: 293665046}
-  _mainCamera: {fileID: 330585545}
+  _cooldawnManager: {fileID: 293665050}
   _pInputHandler: {fileID: 1746522192}
+  _mainCamera: {fileID: 330585545}
   _raycastDistance: 3
 --- !u!114 &293665049
 MonoBehaviour:
@@ -216,6 +218,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstPersonBuilder
   _mainCamera: {fileID: 330585545}
   _pInputHandler: {fileID: 1746522192}
+  _cooldawnManager: {fileID: 293665050}
   _currentBuilding: {fileID: 11400000, guid: 83ce5886de0c37c43acc9e531561f81a, type: 2}
   _currentWallBuilding: {fileID: 11400000, guid: 6d9fbe94d238b9c4b8363aee294cc94d, type: 2}
   _raycastDistance: 10
@@ -223,6 +226,20 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   _wallMode: 0
+--- !u!114 &293665050
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 293665045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 595cef554f0aa404781c009b1effe11c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ToolCooldawnManager
+  _pInputHandler: {fileID: 1746522192}
+  _maxCooldownTime: 1
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -1419,6 +1436,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62c926d108015fc488314af9a18d6cc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInputHandler
+  attackTiggered: 0
   rotateTriggered: 0
 --- !u!4 &1746522193
 Transform:
@@ -1636,7 +1654,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1847783801
 MonoBehaviour:
   m_ObjectHideFlags: 0

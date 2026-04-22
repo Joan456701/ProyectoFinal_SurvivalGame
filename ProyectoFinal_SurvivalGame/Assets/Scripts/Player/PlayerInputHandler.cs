@@ -9,7 +9,7 @@ public class PlayerInputHandler : MonoBehaviour
     public bool jumpTriggered { get; private set; }
     public bool sprintTriggered { get; private set; }
     public bool interactTriggered { get; private set; }
-    public bool attackTiggered { get; private set; }
+    public bool attackTiggered;
     public bool isBuildMode {  get; private set; } = false;
     public bool destroyTriggered { get; private set; }
     

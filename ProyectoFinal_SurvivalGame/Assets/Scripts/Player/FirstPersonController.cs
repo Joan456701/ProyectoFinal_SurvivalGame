@@ -1,3 +1,4 @@
+using System.Diagnostics.Tracing;
 using UnityEngine;
 using static UnityEngine.UI.Image;
 
@@ -17,8 +18,9 @@ public class FirstPersonController : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private CharacterController _characterController;
-    [SerializeField] private Camera _mainCamera;
+    [SerializeField] private ToolCooldawnManager _cooldawnManager;
     [SerializeField] private PlayerInputHandler _pInputHandler;
+    [SerializeField] private Camera _mainCamera;
 
     [Header("Interaction")]
     [SerializeField] private float _raycastDistance;
@@ -47,13 +49,25 @@ public class FirstPersonController : MonoBehaviour
 
             if (Physics.Raycast(origin, direction, out hitInfo, _raycastDistance))
             {
-               
+
             }
         }
+    }
+    private void OnEnable()
+    {
+        _cooldawnManager.OnActionFired += PlayerAttack;
+    }
 
-        if (_pInputHandler.attackTiggered && !_pInputHandler.isBuildMode)
+    private void OnDisable()
+    {
+        _cooldawnManager.OnActionFired -= PlayerAttack;
+    }
+
+    private void PlayerAttack()
+    {
+        if (!_pInputHandler.isBuildMode)
         {
-            //Debug.Log("El jugador ha atacado");
+            Debug.Log("El jugador ha atacado");
 
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
@@ -122,12 +136,6 @@ public class FirstPersonController : MonoBehaviour
         ApplyHorizontalRotation(mouseX);
         ApplyVerticalRotation(-mouseY);
     }
-    private void FixedUpdate()
-    {
-        HandleMovement();
-        HandleRotation();
-    }
-
     private void DrawRaycast()
     {
         Vector3 origin = _mainCamera.transform.position;

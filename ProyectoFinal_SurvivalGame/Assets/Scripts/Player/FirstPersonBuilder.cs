@@ -5,6 +5,7 @@ public class FirstPersonBuilder : MonoBehaviour
     [Header("References")]
     [SerializeField] private Camera _mainCamera;
     [SerializeField] private PlayerInputHandler _pInputHandler;
+    [SerializeField] private ToolCooldawnManager _cooldawnManager;
 
     [Header("Pieces Settings")]
     [SerializeField] private BuildingPieceSO _currentBuilding;
@@ -15,7 +16,6 @@ public class FirstPersonBuilder : MonoBehaviour
     [SerializeField] private LayerMask _edgeLayer;
 
     private bool _hasBuiltThisPress = false;
-    private bool _hasDestroyedThisPress = false;
     public bool _wallMode = false;
 
     private float _currentRotation = 0;
@@ -45,17 +45,6 @@ public class FirstPersonBuilder : MonoBehaviour
             _hasBuiltThisPress = false;
         }
 
-        if (_pInputHandler.destroyTriggered && _pInputHandler.isBuildMode)
-        {
-            if (!_hasDestroyedThisPress)
-            {
-                TryDestroy();
-                _hasDestroyedThisPress = true;
-            }
-            else
-                _hasDestroyedThisPress = false;
-        }
-        
         if (_pInputHandler.rotateTriggered && _pInputHandler.isBuildMode)
         {
                 _currentRotation += 90;
@@ -112,37 +101,6 @@ public class FirstPersonBuilder : MonoBehaviour
                 }
                 else
                     Debug.Log("Esta casilla ya esta ocupada");
-            }
-        }
-    }
-
-    private void TryDestroy()
-    {
-        Vector3 origin = _mainCamera.transform.position;
-        Vector3 direction = _mainCamera.transform.forward;
-
-        if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
-        {
-            if (hitInfo.collider.TryGetComponent(out FloorEdgePlacedObject wallObject))
-            {
-                Destroy(wallObject.gameObject);
-                return;
-            }
-
-            Grid<GridObject> currentGrid = GridManager.Instance.GetGrid(hitInfo.point);
-
-            currentGrid.GetXZ(hitInfo.point, out int x, out int z);
-            GridObject gridObject = currentGrid.GetGridObject(x, z);
-
-            if (gridObject != null)
-            {
-                Transform objectToDestroy = gridObject.GetPlacedObject();
-
-                if (objectToDestroy != null)
-                {
-                    Destroy(objectToDestroy.gameObject);
-                    gridObject.SetPlacedObject(null);
-                }
             }
         }
     }

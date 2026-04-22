@@ -199,6 +199,7 @@ MonoBehaviour:
   _downFloorEdgePosition: {fileID: 1336205726087615861}
   _leftFloorEdgePosition: {fileID: 1105468985258142976}
   _rightFloorEdgePosition: {fileID: 6649308176992837550}
+  _maxHealth: 2
 --- !u!65 &3631490144685224467
 BoxCollider:
   m_ObjectHideFlags: 0

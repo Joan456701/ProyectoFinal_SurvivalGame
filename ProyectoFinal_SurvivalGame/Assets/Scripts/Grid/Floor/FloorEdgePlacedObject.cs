@@ -1,16 +1,26 @@
 using UnityEngine;
 
-public class FloorEdgePlacedObject : MonoBehaviour
+public class FloorEdgePlacedObject : MonoBehaviour, IDamagable
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    [Header("Vida Estructura")]
+    [SerializeField] private int _maxHealth;
+    private int _health;
     void Start()
     {
-        
+        _health = _maxHealth;
     }
 
-    // Update is called once per frame
-    void Update()
+    public void DamageRecived(int damage)
     {
-        
+        _health -= damage;
+
+        if (_health <= 0)
+        {
+            Grid<GridObject> grid = GridManager.Instance.GetGrid(transform.position);
+            grid.GetXZ(transform.position, out int x, out int z);
+            grid.GetGridObject(x, z)?.SetPlacedObject(null);
+
+            Destroy(gameObject);
+        }
     }
 }

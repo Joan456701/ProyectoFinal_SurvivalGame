@@ -1,7 +1,10 @@
+using NUnit.Framework;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class GridManager : MonoBehaviour
 {
+    // Instancia global para acceder a este script desde cualquier lado sin buscarlo
     public static GridManager Instance { get; private set; }
 
     [Header("Ajustes del Grid")]
@@ -9,17 +12,39 @@ public class GridManager : MonoBehaviour
     [SerializeField] private int _height = 10;
     [SerializeField] private float _cellSize = 3f;
 
-    private Grid<GridObject> _grid;
+    // Lista que almacena todos los pisos del mundo
+    private List<Grid<GridObject>> _gridList;
+    [SerializeField] private int _gridVerticalCoutn = 1; // Cantidad total de pisos
+    [SerializeField] private float _gridVerticalSize = 2; // Altura de cada piso
+
     private void Awake()
     {
         Instance = this;
+        _gridList = new List<Grid<GridObject>>();
+        
+        //Bucle para generar los pisos
+        for (int i = 0; i < _gridVerticalCoutn; i++)
+        {
+            // Calcula la altura de cada piso
+            Vector3 worldOrigin = new Vector3(0, i * _gridVerticalSize, 0);
 
-        _grid = new Grid<GridObject>(_width, _height, _cellSize, (Grid<GridObject> g, int x, int z) => new GridObject(g, x, z));
+            // Genera la cuadricula en la posicion y la añade a la lista
+            Grid<GridObject> newGrid = new Grid<GridObject>(_width, _height, _cellSize, worldOrigin, (Grid<GridObject> g, int x, int z) => new GridObject(g, x, z));
+        
+            _gridList.Add(newGrid);
+        }
     }
 
-    public Grid<GridObject> GetGrid()
+    //Devuelve el piso correspondiente segun la posicion
+    public Grid<GridObject> GetGrid(Vector3 worldPosition)
     {
-        return _grid;
+        //Calcula el indice del piso dividiendo la altura entre el tamaño del piso
+        int gridIndex = Mathf.RoundToInt(worldPosition.y / _gridVerticalSize);
+
+        //Evita que el indice se salga de los limites
+        gridIndex = Mathf.Clamp(gridIndex, 0, _gridList.Count -1);
+
+        return _gridList[gridIndex];
     }
 
     private void OnDrawGizmos()

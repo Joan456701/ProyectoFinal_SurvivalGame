@@ -14,7 +14,6 @@ public class FirstPersonBuilder : MonoBehaviour
     [SerializeField] private float _raycastDistance;
     [SerializeField] private LayerMask _edgeLayer;
 
-    private Grid<GridObject> _grid;
     private bool _hasBuiltThisPress = false;
     private bool _hasDestroyedThisPress = false;
     public bool _wallMode = false;
@@ -24,8 +23,6 @@ public class FirstPersonBuilder : MonoBehaviour
 
     private void Start()
     {
-        _grid = GridManager.Instance.GetGrid();
-
         RefreshGhost();
 
         _ghostObject.gameObject.SetActive(false);
@@ -80,6 +77,7 @@ public class FirstPersonBuilder : MonoBehaviour
             {
                 FloorPlacedObject fatherWall = pointedEdge.GetComponentInParent<FloorPlacedObject>();
 
+                //Si detecta el borde y esta libre permite construir
                 if (fatherWall != null && _currentWallBuilding != null)
                 {
                     if (!fatherWall.HasEdgeObject(pointedEdge.edge))
@@ -100,16 +98,16 @@ public class FirstPersonBuilder : MonoBehaviour
             {
                 Debug.Log("2. El láser ha chocado contra: " + hitInfo.collider.name + " en la pos: " + hitInfo.point);
 
-                _grid.GetXZ(hitInfo.point, out int x, out int z);
+                //Pide al gridManger que le diga que piso es
+                Grid<GridObject> currentGrid = GridManager.Instance.GetGrid(hitInfo.point);
+                currentGrid.GetXZ(hitInfo.point, out int x, out int z);
+                GridObject gridObject = currentGrid.GetGridObject(x, z);
 
-                GridObject gridObject = _grid.GetGridObject(x, z);
-
+                //Si la casilla esta libre contruye el suelo u lo guarda en su memoria
                 if (gridObject.CanBuild())
                 {
-                    Vector3 buildPosition = _grid.GetWorldPosition(x, z);
-
+                    Vector3 buildPosition = currentGrid.GetWorldPosition(x, z);
                     Transform builtObject = Instantiate(_currentBuilding.prefab, buildPosition, Quaternion.Euler(0, _currentRotation, 0));
-
                     gridObject.SetPlacedObject(builtObject);
                 }
                 else
@@ -125,8 +123,16 @@ public class FirstPersonBuilder : MonoBehaviour
 
         if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
         {
-            _grid.GetXZ(hitInfo.point, out int x, out int z);
-            GridObject gridObject = _grid.GetGridObject(x, z);
+            if (hitInfo.collider.TryGetComponent(out FloorEdgePlacedObject wallObject))
+            {
+                Destroy(wallObject.gameObject);
+                return;
+            }
+
+            Grid<GridObject> currentGrid = GridManager.Instance.GetGrid(hitInfo.point);
+
+            currentGrid.GetXZ(hitInfo.point, out int x, out int z);
+            GridObject gridObject = currentGrid.GetGridObject(x, z);
 
             if (gridObject != null)
             {
@@ -177,8 +183,10 @@ public class FirstPersonBuilder : MonoBehaviour
 
             if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
             {
-                _grid.GetXZ(hitInfo.point, out int x, out int z);
-                GridObject gridObject = _grid.GetGridObject(x, z);
+                Grid<GridObject> currentGrid = GridManager.Instance.GetGrid(hitInfo.point);
+
+                currentGrid.GetXZ(hitInfo.point, out int x, out int z);
+                GridObject gridObject = currentGrid.GetGridObject(x, z);
 
                 if (gridObject != null)
                 {
@@ -186,7 +194,7 @@ public class FirstPersonBuilder : MonoBehaviour
                     {
                         _ghostObject.gameObject.SetActive(true);
 
-                        Vector3 targetPosition = _grid.GetWorldPosition(x, z);
+                        Vector3 targetPosition = currentGrid.GetWorldPosition(x, z);
 
                         _ghostObject.position = targetPosition;
                         _ghostObject.rotation = Quaternion.Euler(0, _currentRotation, 0);

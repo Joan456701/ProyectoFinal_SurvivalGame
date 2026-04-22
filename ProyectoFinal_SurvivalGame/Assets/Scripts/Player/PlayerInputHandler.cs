@@ -4,6 +4,8 @@ using UnityEngine.InputSystem;
 public class PlayerInputHandler : MonoBehaviour
 {
     private PlayerInput _playerControls;
+    private bool _controlsInitialized;
+
     public Vector2 movementInput { get; private set; }
     public Vector2 rotationInput { get; private set; }
     public bool jumpTriggered { get; private set; }
@@ -17,6 +19,16 @@ public class PlayerInputHandler : MonoBehaviour
 
     private void Awake()
     {
+        InitializeControls();
+    }
+
+    private void InitializeControls()
+    {
+        if (_controlsInitialized)
+        {
+            return;
+        }
+
         // Inicializacion de los controles
         _playerControls = new PlayerInput();
 
@@ -40,7 +52,7 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.Player.Interact.performed += inputInfo => interactTriggered = true;
         _playerControls.Player.Interact.canceled += inputInfo => interactTriggered = false;
 
-        // --- Atack ---
+        // --- Attack ---
         _playerControls.Player.Attack.performed += inputInfo => attackTiggered = true;
         _playerControls.Player.Attack.canceled += inputInfo => attackTiggered = false;
 
@@ -54,15 +66,29 @@ public class PlayerInputHandler : MonoBehaviour
         // --- Rotate Objects ---
         _playerControls.Player.Rotate.performed += inputInfo => rotateTriggered = true;
         _playerControls.Player.Rotate.canceled += inputInfo => rotateTriggered = false;
+
+        _controlsInitialized = true;
     }
 
     private void OnEnable()
     {
+        InitializeControls();
+
+        if (_playerControls == null)
+        {
+            return;
+        }
+
         _playerControls.Enable();
     }
 
     private void OnDisable()
     {
+        if (_playerControls == null)
+        {
+            return;
+        }
+
         _playerControls.Disable();
     }
 }

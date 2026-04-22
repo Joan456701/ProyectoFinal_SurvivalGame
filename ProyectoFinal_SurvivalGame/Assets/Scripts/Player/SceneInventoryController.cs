@@ -169,6 +169,7 @@ public class SceneInventoryController : MonoBehaviour
         HandleSplitShortcut();
         HandleHeldItemDropShortcuts();
         HandleUndoShortcut();
+        HandleEatFoodShortcut();
     }
 
     private void SaveUndoState()
@@ -240,6 +241,28 @@ public class SceneInventoryController : MonoBehaviour
         if ((Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed) && Keyboard.current.zKey.wasPressedThisFrame)
         {
             Undo();
+        }
+    }
+
+    private void HandleEatFoodShortcut()
+    {
+        if (Keyboard.current == null)
+        {
+            return;
+        }
+
+        if (Keyboard.current.cKey.wasPressedThisFrame && !string.IsNullOrEmpty(_heldItemId) && _heldItemId == "Comida")
+        {
+            Debug.Log("Has consumido comida. La barra de comida ha subido!");
+            for (int i = 0; i < _slots.Count; i++)
+            {
+                if (!_slots[i].IsEmpty && _slots[i].item.itemId == "Comida")
+                {
+                    TryRemoveFromSlot(i, 1, true);
+                    break;
+                }
+            }
+            RefreshUI();
         }
     }
 
@@ -445,7 +468,7 @@ public class SceneInventoryController : MonoBehaviour
         RegisterItem("stone", "Piedra", "Fragmento mineral recogido del entorno. Puede utilizarse como recurso basico para supervivencia y construccion.", new Color(0.62f, 0.64f, 0.68f), 30, PrimitiveType.Cube, new Vector3(1f, 1f, 1f));
         RegisterItem("luminous_resin", "Resina luminosa", "Compuesto organico con brillo natural. Puede servir mas adelante para antorchas y adhesivos.", new Color(0.3f, 0.95f, 1f), 15, PrimitiveType.Sphere, new Vector3(0.55f, 0.55f, 0.55f));
         RegisterItem("purified_water", "Agua purificada", "Suministro basico de supervivencia. Conviene reservarla para expediciones largas.", new Color(0.45f, 0.7f, 1f), 10, PrimitiveType.Cylinder, new Vector3(0.45f, 0.6f, 0.45f));
-        RegisterItem("dehydrated_food", "Comida deshidratada", "Racion compacta y duradera. Buena para mantener recursos siempre a mano.", new Color(1f, 0.68f, 0.28f), 10, PrimitiveType.Cylinder, new Vector3(0.5f, 0.25f, 0.5f));
+        RegisterItem("Comida", "Comida", "Comida которую puedes consumir para recuperar hambre.", new Color(1f, 0.68f, 0.28f), 10, PrimitiveType.Sphere, new Vector3(0.5f, 0.5f, 0.5f));
         RegisterItem("Bombona", "Bombona de oxigeno", "Tanque de oxigeno. Se acabara el tiempo, moriras.", new Color(0.2f, 0.8f, 1f), 1, PrimitiveType.Capsule, new Vector3(0.3f, 0.6f, 0.3f));
     }
 

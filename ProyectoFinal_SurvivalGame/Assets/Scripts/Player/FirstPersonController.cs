@@ -67,12 +67,14 @@ public class FirstPersonController : MonoBehaviour
     }
     private void OnEnable()
     {
-        _cooldawnManager.OnActionFired += PlayerAttack;
+        if (_cooldawnManager != null)
+            _cooldawnManager.OnActionFired += PlayerAttack;
     }
 
     private void OnDisable()
     {
-        _cooldawnManager.OnActionFired -= PlayerAttack;
+        if (_cooldawnManager != null)
+            _cooldawnManager.OnActionFired -= PlayerAttack;
     }
 
     private void PlayerAttack()

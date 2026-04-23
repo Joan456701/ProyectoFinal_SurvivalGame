@@ -51,8 +51,6 @@ public class FirstPersonBuilder : MonoBehaviour
 
                 if (_currentRotation >= 360)
                     _currentRotation = 0;
-
-            _pInputHandler.rotateTriggered = false;
         }
     }
 
@@ -81,11 +79,11 @@ public class FirstPersonBuilder : MonoBehaviour
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
 
-            Debug.Log("1. Botón pulsado. Disparando láser...");
+            Debug.Log("1. Botï¿½n pulsado. Disparando lï¿½ser...");
 
             if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
             {
-                Debug.Log("2. El láser ha chocado contra: " + hitInfo.collider.name + " en la pos: " + hitInfo.point);
+                Debug.Log("2. El lï¿½ser ha chocado contra: " + hitInfo.collider.name + " en la pos: " + hitInfo.point);
 
                 //Pide al gridManger que le diga que piso es
                 Grid<GridObject> currentGrid = GridManager.Instance.GetGrid(hitInfo.point);
@@ -205,3 +203,4 @@ public class FirstPersonBuilder : MonoBehaviour
             _ghostObject.gameObject.SetActive(false);
     }
 }
+

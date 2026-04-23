@@ -79,8 +79,10 @@ public class OxygenSystem : MonoBehaviour
 
             UpdateOxygenUI();
         }
-        else if (_isTakingOxygenDamage && !_isPaused)
+
+        if ((_currentOxygenTime <= 0 || !_hasOxygenTank) && !_isPaused)
         {
+            _isTakingOxygenDamage = true;
             _oxygenDamageTimer += Time.deltaTime;
             if (_oxygenDamageTimer >= 1f)
             {
@@ -110,17 +112,6 @@ public class OxygenSystem : MonoBehaviour
             {
                 int damage = Mathf.RoundToInt(_damagePerSecond);
                 damagable.DamageRecived(damage);
-                Debug.Log("Daño por falta de oxigeno: -" + damage + " de vida");
-
-                if (_deathScreen != null)
-                {
-                    _deathScreen.SetActive(true);
-                    _firstPersonController.enabled = false;
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                    Debug.Log("El jugador ha muerto por falta de oxigeno");
-                    _isTakingOxygenDamage = false;
-                }
             }
         }
     }

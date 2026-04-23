@@ -2,7 +2,7 @@ using System.Diagnostics.Tracing;
 using UnityEngine;
 using static UnityEngine.UI.Image;
 
-public class FirstPersonController : MonoBehaviour
+public class FirstPersonController : MonoBehaviour, IDamagable
 {
     [Header("Movment Speeds")]
     [SerializeField] private float _walkSpeed = 5f;
@@ -22,6 +22,11 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private PlayerInputHandler _pInputHandler;
     [SerializeField] private Camera _mainCamera;
     [SerializeField] private SceneInventoryController _inventoryController;
+
+    [Header("Death Settings")]
+    [SerializeField] private GameObject _deathScreen;
+    [SerializeField] private float _playerHealth = 100f;
+    [SerializeField] private float _maxPlayerHealth = 100f;
 
     [Header("Interaction")]
     [SerializeField] private float _raycastDistance;
@@ -179,5 +184,46 @@ public class FirstPersonController : MonoBehaviour
         Vector3 origin = _mainCamera.transform.position;
         Vector3 direction = _mainCamera.transform.forward;
         Debug.DrawRay(origin, direction * _raycastDistance, Color.red);
+    }
+
+    public void DamageRecived(int damage)
+    {
+        _playerHealth -= damage;
+        Debug.Log("Daño recibido: -" + damage + " de vida. Vida actual: " + Mathf.RoundToInt(_playerHealth) + "/" + _maxPlayerHealth);
+
+        if (_playerHealth <= 0)
+        {
+            _playerHealth = 0;
+            if (_deathScreen != null)
+            {
+                _deathScreen.SetActive(true);
+                enabled = false;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                Debug.Log("El jugador ha muerto");
+                Debug.Log("JUEGO TERMINADO - Has muerto");
+            }
+        }
+    }
+
+    public void HealPlayer(int amount)
+    {
+        if (_playerHealth >= _maxPlayerHealth)
+        {
+            Debug.Log("Ya tienes la vida al máximo. No puedes consumir más comida.");
+            return;
+        }
+
+        _playerHealth = Mathf.Min(_playerHealth + amount, _maxPlayerHealth);
+    }
+
+    public float GetHealth()
+    {
+        return _playerHealth;
+    }
+
+    public float GetMaxHealth()
+    {
+        return _maxPlayerHealth;
     }
 }

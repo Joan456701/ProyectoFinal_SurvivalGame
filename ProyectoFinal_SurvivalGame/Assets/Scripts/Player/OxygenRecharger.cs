@@ -15,6 +15,7 @@ public class OxygenRecharger : MonoBehaviour
     [SerializeField] private Renderer _indicatorLight;
 
     private GameObject _player;
+    private PlayerInputHandler _playerInputHandler;
     private bool _canInteract;
     private bool _playerFound;
 
@@ -35,6 +36,16 @@ public class OxygenRecharger : MonoBehaviour
         {
             _player = FindFirstObjectByType<CharacterController>()?.gameObject;
         }
+
+        if (_player != null)
+        {
+            _playerInputHandler = _player.GetComponent<PlayerInputHandler>();
+            if (_playerInputHandler == null)
+            {
+                _playerInputHandler = FindFirstObjectByType<PlayerInputHandler>();
+            }
+        }
+
         _playerFound = _player != null;
 
         if (_showDebugInfo && !_playerFound)
@@ -47,7 +58,7 @@ public class OxygenRecharger : MonoBehaviour
     {
         CheckPlayerProximity();
 
-        if (_canInteract && Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+        if (_canInteract && _playerInputHandler != null && _playerInputHandler.interactTriggered)
         {
             Interact();
         }

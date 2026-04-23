@@ -233,12 +233,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleUndoShortcut()
     {
-        if (Keyboard.current == null)
-        {
-            return;
-        }
-
-        if ((Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed) && Keyboard.current.zKey.wasPressedThisFrame)
+        if (_playerInputHandler != null && _playerInputHandler.undoTriggered)
         {
             Undo();
         }
@@ -246,23 +241,32 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleEatFoodShortcut()
     {
-        if (Keyboard.current == null)
+        if (_playerInputHandler != null && _playerInputHandler.eatTriggered)
         {
-            return;
-        }
+            int slotIndexToEat = -1;
 
-        if (Keyboard.current.cKey.wasPressedThisFrame && !string.IsNullOrEmpty(_heldItemId) && _heldItemId == "Comida")
-        {
-            Debug.Log("Has consumido comida. La barra de comida ha subido!");
-            for (int i = 0; i < _slots.Count; i++)
+            if (_selectedSlotIndex >= 0 && _selectedSlotIndex < _slots.Count && 
+                !_slots[_selectedSlotIndex].IsEmpty && _slots[_selectedSlotIndex].item.itemId == "Comida")
             {
-                if (!_slots[i].IsEmpty && _slots[i].item.itemId == "Comida")
-                {
-                    TryRemoveFromSlot(i, 1, true);
-                    break;
-                }
+                slotIndexToEat = _selectedSlotIndex;
             }
-            RefreshUI();
+            else if (_activeHotbarSlotIndex >= 0 && _activeHotbarSlotIndex < _slots.Count &&
+                    !_slots[_activeHotbarSlotIndex].IsEmpty && _slots[_activeHotbarSlotIndex].item.itemId == "Comida")
+            {
+                slotIndexToEat = _activeHotbarSlotIndex;
+            }
+
+            if (slotIndexToEat >= 0)
+            {
+                FirstPersonController player = FindFirstObjectByType<FirstPersonController>();
+                if (player != null)
+                {
+                    player.HealPlayer(20);
+                    Debug.Log("Has consumido comida. Vida regenerada: " + Mathf.RoundToInt(player.GetHealth()) + "/" + player.GetMaxHealth());
+                }
+                TryRemoveFromSlot(slotIndexToEat, 1, true);
+                RefreshUI();
+            }
         }
     }
 
@@ -520,14 +524,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleInventoryToggle()
     {
-        if (Keyboard.current == null)
-        {
-            return;
-        }
-
-        bool shouldToggle = Keyboard.current.iKey.wasPressedThisFrame;
-
-        if (!shouldToggle)
+        if (_playerInputHandler == null || !_playerInputHandler.inventoryTriggered)
         {
             return;
         }
@@ -537,21 +534,21 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleHotbarShortcuts()
     {
-        if (Keyboard.current == null)
+        if (_playerInputHandler == null)
         {
             return;
         }
 
-        if (Keyboard.current.digit1Key.wasPressedThisFrame) HandleHotbarKeyPressed(0);
-        if (_hotbarSize > 1 && Keyboard.current.digit2Key.wasPressedThisFrame) HandleHotbarKeyPressed(1);
-        if (_hotbarSize > 2 && Keyboard.current.digit3Key.wasPressedThisFrame) HandleHotbarKeyPressed(2);
-        if (_hotbarSize > 3 && Keyboard.current.digit4Key.wasPressedThisFrame) HandleHotbarKeyPressed(3);
-        if (_hotbarSize > 4 && Keyboard.current.digit5Key.wasPressedThisFrame) HandleHotbarKeyPressed(4);
+        if (_playerInputHandler.slot1Triggered) HandleHotbarKeyPressed(0);
+        if (_hotbarSize > 1 && _playerInputHandler.slot2Triggered) HandleHotbarKeyPressed(1);
+        if (_hotbarSize > 2 && _playerInputHandler.slot3Triggered) HandleHotbarKeyPressed(2);
+        if (_hotbarSize > 3 && _playerInputHandler.slot4Triggered) HandleHotbarKeyPressed(3);
+        if (_hotbarSize > 4 && _playerInputHandler.slot5Triggered) HandleHotbarKeyPressed(4);
     }
 
     private void HandleDropShortcut()
     {
-        if (!_inventoryOpen || Keyboard.current == null || !Keyboard.current.rKey.wasPressedThisFrame)
+        if (!_inventoryOpen || _playerInputHandler == null || !_playerInputHandler.dropTriggered)
         {
             return;
         }
@@ -561,7 +558,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleEquipShortcut()
     {
-        if (!_inventoryOpen || Keyboard.current == null || !Keyboard.current.tKey.wasPressedThisFrame)
+        if (!_inventoryOpen || _playerInputHandler == null || !_playerInputHandler.equipTriggered)
         {
             return;
         }
@@ -571,7 +568,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleSplitShortcut()
     {
-        if (!_inventoryOpen || Keyboard.current == null || !Keyboard.current.xKey.wasPressedThisFrame)
+        if (!_inventoryOpen || _playerInputHandler == null || !_playerInputHandler.subdivideTriggered)
         {
             return;
         }
@@ -581,22 +578,22 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleHeldItemDropShortcuts()
     {
-        if (_inventoryOpen || Keyboard.current == null)
+        if (_inventoryOpen || _playerInputHandler == null)
         {
             return;
         }
 
-        if (Keyboard.current.gKey.wasPressedThisFrame)
+        if (_playerInputHandler.dropAllTriggered)
         {
             DropFromActiveHotbarStack(DropMode.FullStack);
         }
 
-        if (Keyboard.current.hKey.wasPressedThisFrame)
+        if (_playerInputHandler.dropHalfTriggered)
         {
             DropFromActiveHotbarStack(DropMode.HalfStack);
         }
 
-        if (Keyboard.current.jKey.wasPressedThisFrame)
+        if (_playerInputHandler.dropOneTriggered)
         {
             DropFromActiveHotbarStack(DropMode.SingleUnit);
         }

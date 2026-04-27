@@ -1099,7 +1099,7 @@ public class SceneInventoryController : MonoBehaviour
 
             foreach (GameObject childObj in childrenToDestroy)
             {
-                Debug.Log("Destruyendo: " + childObj.name);
+                //Debug.Log("Destruyendo: " + childObj.name);
                 if (Application.isPlaying)
                 {
                     Destroy(childObj);

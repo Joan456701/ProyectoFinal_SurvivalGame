@@ -19,8 +19,6 @@ public class ToolCooldawnManager : MonoBehaviour
 
     void Update()
     {
-        Debug.Log(_pInputHandler.attackTiggered);
-
         if (_cooldownTime < _maxCooldownTime)
         {
             _cooldownTime += Time.deltaTime;

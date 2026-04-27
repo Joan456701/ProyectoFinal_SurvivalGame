@@ -17,11 +17,12 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private float _upDownLookRange = 80f;
 
     [Header("References")]
+    [SerializeField] private SceneInventoryController _inventoryController;
     [SerializeField] private CharacterController _characterController;
     [SerializeField] private ToolCooldawnManager _cooldawnManager;
     [SerializeField] private PlayerInputHandler _pInputHandler;
+    [SerializeField] private RadialMenuManager _rMenuManager;
     [SerializeField] private Camera _mainCamera;
-    [SerializeField] private SceneInventoryController _inventoryController;
 
     [Header("Interaction")]
     [SerializeField] private float _raycastDistance;
@@ -45,7 +46,12 @@ public class FirstPersonController : MonoBehaviour
     {
         //DrawRaycast();
         HandleMovement();
-        HandleRotation();
+
+        if (!_rMenuManager.isMenuActive)
+        {
+            HandleRotation();
+        }
+
         UpdatePickupPrompt();
 
         if (_pInputHandler.interactTriggered)

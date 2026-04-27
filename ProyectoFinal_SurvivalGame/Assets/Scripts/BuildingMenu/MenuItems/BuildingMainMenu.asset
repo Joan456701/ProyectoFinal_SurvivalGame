@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a18c1606a907a1488ae410838c99f8c, type: 3}
+  m_Name: BuildingMainMenu
+  m_EditorClassIdentifier: Assembly-CSharp::RadialMenuSO
+  elements:
+  - {fileID: 11400000, guid: a3fd1d113ed81c24f9d0b2a1b9bc16b6, type: 2}
+  - {fileID: 11400000, guid: 62c0f35a0ab32cd4482db64258b0dcb2, type: 2}
+  - {fileID: 11400000, guid: e8d47f12b592d8c4f800642445978b46, type: 2}
+  - {fileID: 11400000, guid: 31c30317aaf3e1a44af43a9ad1711a74, type: 2}

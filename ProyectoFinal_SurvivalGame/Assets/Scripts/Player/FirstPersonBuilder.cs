@@ -2,23 +2,28 @@ using UnityEngine;
 
 public class FirstPersonBuilder : MonoBehaviour
 {
-    [Header("References")]
+    [Header("Referencias")]
     [SerializeField] private Camera _mainCamera;
     [SerializeField] private PlayerInputHandler _pInputHandler;
     [SerializeField] private ToolCooldawnManager _cooldawnManager;
 
-    [Header("Pieces Settings")]
-    [SerializeField] private BuildingPieceSO _currentBuilding;
-    [SerializeField] private FloorEdgeObjectTypeSO _currentWallBuilding;
-
-    [Header("Contsrtuction Settings")]
+    [Header("Ajustes de construccion")]
+    [SerializeField] private float _looseObjectRotationAmount;
     [SerializeField] private float _raycastDistance;
     [SerializeField] private LayerMask _edgeLayer;
+    [SerializeField] private LayerMask _obstacleLayer;
+    [SerializeField] private Vector3 _cellSizeDimension;
 
+    [SerializeField] private BuildingPieceSO _currentBuilding;
+    private FloorEdgeObjectTypeSO _currentWallBuilding;
+    private LooseObjectSO _currentLooseBuilding;
+
+    private float _looseObjectRotation = 0;
     private bool _hasBuiltThisPress = false;
+    private bool _stairsMode = false;
+    public bool _looseMode = false;
     public bool _wallMode = false;
 
-    private float _currentRotation = 0;
     private Transform _ghostObject;
 
     private void Start()
@@ -45,14 +50,9 @@ public class FirstPersonBuilder : MonoBehaviour
             _hasBuiltThisPress = false;
         }
 
-        if (_pInputHandler.rotateTriggered && _pInputHandler.isBuildMode)
+        if (_pInputHandler.rotateTriggered && _looseMode)
         {
-                _currentRotation += 90;
-
-                if (_currentRotation >= 360)
-                    _currentRotation = 0;
-
-            _pInputHandler.rotateTriggered = false;
+            _looseObjectRotation += _looseObjectRotationAmount * Time.deltaTime;  
         }
     }
 
@@ -62,42 +62,76 @@ public class FirstPersonBuilder : MonoBehaviour
         { 
             FloorEdgePosition pointedEdge = GetMouseFloorEdgePosition();
 
-            if (pointedEdge != null)
+            if (pointedEdge != null && pointedEdge.transform.parent != null)
             {
-                FloorPlacedObject fatherWall = pointedEdge.GetComponentInParent<FloorPlacedObject>();
+                FloorPlacedObject fatherFloor = pointedEdge.GetComponentInParent<FloorPlacedObject>();
 
-                //Si detecta el borde y esta libre permite construir
-                if (fatherWall != null && _currentWallBuilding != null)
-                {
-                    if (!fatherWall.HasEdgeObject(pointedEdge.edge))
-                        fatherWall.PlaceEdge(pointedEdge.edge, _currentWallBuilding);
+                if (fatherFloor != null && _currentWallBuilding != null)
+                {   
+                    FloorPlacedObject.Edge currentEdge = pointedEdge.edge;
+                    FloorPlacedObject.Edge oppositeEdge = GetOppositeEdge(currentEdge);
+
+                    if (_stairsMode && fatherFloor.HasAnyStairs()) 
+                        return;
+
+                    if (!_stairsMode)
+                    {
+                        if (fatherFloor.IsStairsAtEdge(currentEdge) || fatherFloor.IsStairsAtEdge(oppositeEdge))
+                            return;
+                    }
                     else
-                        Debug.Log("Este hueco ya esta ocupado");
+                    {
+                        if (fatherFloor.HasEdgeObject(oppositeEdge))
+                            return;
+                    }
+
+                    if (!fatherFloor.HasEdgeObject(currentEdge))
+                        fatherFloor.PlaceEdge(currentEdge, _currentWallBuilding);
                 }
             }
         }
-        else
-        { 
+        else if (_looseMode)
+        {
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
 
-            Debug.Log("1. Botón pulsado. Disparando láser...");
+            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
+            {
+                Vector3 checkCenter = hitInfo.point + new Vector3(0, _currentLooseBuilding.clearanceSize.y / 2f, 0);
+                
+                bool isSpaceOccupied = Physics.CheckBox(checkCenter, _currentLooseBuilding.clearanceSize / 2f,
+                    _ghostObject.rotation, _obstacleLayer);
+
+                if (!isSpaceOccupied)
+                    Instantiate(_currentLooseBuilding.prefab, hitInfo.point, Quaternion.Euler(0, _looseObjectRotation,0));
+            }
+        }
+        else
+        {
+            Vector3 origin = _mainCamera.transform.position;
+            Vector3 direction = _mainCamera.transform.forward;
 
             if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
             {
-                Debug.Log("2. El láser ha chocado contra: " + hitInfo.collider.name + " en la pos: " + hitInfo.point);
-
                 //Pide al gridManger que le diga que piso es
                 Grid<GridObject> currentGrid = GridManager.Instance.GetGrid(hitInfo.point);
                 currentGrid.GetXZ(hitInfo.point, out int x, out int z);
                 GridObject gridObject = currentGrid.GetGridObject(x, z);
 
-                //Si la casilla esta libre contruye el suelo u lo guarda en su memoria
+                //Si la casilla esta libre contruye el suelo y lo guarda en su memoria
                 if (gridObject.CanBuild())
                 {
                     Vector3 buildPosition = currentGrid.GetWorldPosition(x, z);
-                    Transform builtObject = Instantiate(_currentBuilding.prefab, buildPosition, Quaternion.Euler(0, _currentRotation, 0));
-                    gridObject.SetPlacedObject(builtObject);
+                    Vector3 centerPosition = buildPosition + (_cellSizeDimension/2);
+
+                    //Comprobamos si hay algun objeto en esa casilla que nos bloquee la construccion
+                    if (!Physics.CheckBox(centerPosition, _cellSizeDimension / 2, Quaternion.identity, _obstacleLayer))
+                    {
+                        Transform builtObject = Instantiate(_currentBuilding.prefab, buildPosition, Quaternion.identity);
+                        gridObject.SetPlacedObject(builtObject);
+                    }
+                    else
+                        Debug.Log("Hay un obstaculo en la casilla");
                 }
                 else
                     Debug.Log("Esta casilla ya esta ocupada");
@@ -134,6 +168,34 @@ public class FirstPersonBuilder : MonoBehaviour
             else
                 _ghostObject.gameObject.SetActive(false);
         }
+        else if (_looseMode)
+        {
+            Vector3 origin = _mainCamera.transform.position;
+            Vector3 direction = _mainCamera.transform.forward;
+
+            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
+            {
+                Vector3 checkCenter = hitInfo.point + new Vector3(0, _currentLooseBuilding.clearanceSize.y / 2f, 0);
+
+                bool isSpaceOccupied = Physics.CheckBox(checkCenter, _currentLooseBuilding.clearanceSize / 2f,
+                    _ghostObject.rotation, _obstacleLayer);
+
+                if (!isSpaceOccupied)
+                {
+                    _ghostObject.gameObject.SetActive(true);
+                    _ghostObject.position = hitInfo.point;
+                    _ghostObject.rotation = Quaternion.Euler(0, _looseObjectRotation, 0); 
+                }
+                else
+                {
+                    _ghostObject.gameObject.SetActive(false);
+                }
+            }
+            else
+            {
+                _ghostObject.gameObject.SetActive(false);
+            }
+        }
         else
         {
             Vector3 origin = _mainCamera.transform.position;
@@ -150,12 +212,17 @@ public class FirstPersonBuilder : MonoBehaviour
                 {
                     if (gridObject.CanBuild())
                     {
-                        _ghostObject.gameObject.SetActive(true);
-
                         Vector3 targetPosition = currentGrid.GetWorldPosition(x, z);
+                        Vector3 centerPosition = targetPosition + (_cellSizeDimension / 2);
 
-                        _ghostObject.position = targetPosition;
-                        _ghostObject.rotation = Quaternion.Euler(0, _currentRotation, 0);
+                        if (!Physics.CheckBox(centerPosition, _cellSizeDimension / 2, Quaternion.identity, _obstacleLayer))
+                        {
+                            _ghostObject.gameObject.SetActive(true);
+                            _ghostObject.position = targetPosition;
+                            _ghostObject.rotation = Quaternion.identity;
+                        }
+                        else
+                            _ghostObject.gameObject.SetActive(false);
                     }
                     else
                     {
@@ -195,6 +262,11 @@ public class FirstPersonBuilder : MonoBehaviour
             if (_currentWallBuilding != null)
                 _ghostObject = Instantiate(_currentWallBuilding.ghostPrefab);
         }
+        else if (_looseMode)
+        {
+            if (_currentLooseBuilding != null)
+                _ghostObject = Instantiate(_currentLooseBuilding.ghostPrefab);
+        }
         else
         {
             if (_currentBuilding != null)
@@ -203,5 +275,51 @@ public class FirstPersonBuilder : MonoBehaviour
 
         if (_ghostObject != null)
             _ghostObject.gameObject.SetActive(false);
+    }
+
+    public void EquipPiece(RadialMenuElement newPiece)
+    {
+        if (_ghostObject != null)
+        {
+            Destroy(_ghostObject.gameObject);
+        }
+
+        _wallMode = newPiece.isWallType;
+        _stairsMode = newPiece.isStairs;
+        _looseMode = newPiece.isLooseObject;
+
+        if (_wallMode)
+            _currentWallBuilding = newPiece.wallPieceToBuild;
+        else if (_looseMode)
+            _currentLooseBuilding = newPiece.loosePieceToBuild;
+        else
+            _currentBuilding = newPiece.floorPieceToBuild;
+
+        RefreshGhost();
+    }
+
+    private FloorPlacedObject.Edge GetOppositeEdge(FloorPlacedObject.Edge edge)
+    {
+        switch (edge)
+        {
+            case FloorPlacedObject.Edge.Up: return FloorPlacedObject.Edge.Down;
+            case FloorPlacedObject.Edge.Down: return FloorPlacedObject.Edge.Up;
+            case FloorPlacedObject.Edge.Left: return FloorPlacedObject.Edge.Right;
+            case FloorPlacedObject.Edge.Right: return FloorPlacedObject.Edge.Left;
+            default: return edge;
+        }
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (_looseMode && _ghostObject != null && _currentLooseBuilding != null && _ghostObject.gameObject.activeInHierarchy)
+        {
+            Vector3 center = _ghostObject.position + new Vector3(0, _currentLooseBuilding.clearanceSize.y / 2f, 0);
+            Gizmos.matrix = Matrix4x4.TRS(center, _ghostObject.rotation, Vector3.one);
+            Gizmos.color = new Color(1f, 0f, 0f, 0.4f);
+            Gizmos.DrawCube(Vector3.zero, _currentLooseBuilding.clearanceSize);
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireCube(Vector3.zero, _currentLooseBuilding.clearanceSize);
+        }
     }
 }

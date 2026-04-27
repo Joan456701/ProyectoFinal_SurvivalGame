@@ -14,12 +14,28 @@ public class PlayerInputHandler : MonoBehaviour
     public bool attackTiggered;
     public bool isBuildMode {  get; private set; } = false;
     public bool destroyTriggered { get; private set; }
-    
     public bool rotateTriggered;
+    public bool buildingMenu;
+
+
+    //Variables de la interfaz
+    public bool submitTriggered;
+    public bool cancelTriggered;
+    public Vector2 mousePosition;
 
     private void Awake()
     {
         InitializeControls();
+    }
+
+    public void SwitchActionMap(string mapName)
+    {
+        _playerControls.Disable();
+
+        if (mapName == "UI")
+            _playerControls.PlayerUI.Enable();
+        else
+            _playerControls.Player.Enable();
     }
 
     private void InitializeControls()
@@ -63,9 +79,26 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.Player.DestroyProbisional.performed += inputInfo => destroyTriggered = true;
         _playerControls.Player.DestroyProbisional.canceled += inputInfo => destroyTriggered = false;
 
-        // --- Rotate Objects ---
+        // --- Rotate Structures ---
         _playerControls.Player.Rotate.performed += inputInfo => rotateTriggered = true;
         _playerControls.Player.Rotate.canceled += inputInfo => rotateTriggered = false;
+
+        // --- Open Building Menu ---
+        _playerControls.Player.BuildingMenu.performed += inputInfo => buildingMenu = true;
+        _playerControls.Player.BuildingMenu.canceled += inputInfo => buildingMenu = false;
+
+        // --- UI MAP ---
+        // --- Player interact UI ---
+        _playerControls.PlayerUI.InteractUI.performed += inputInfo => submitTriggered = true;
+        _playerControls.PlayerUI.InteractUI.canceled += inputInfo => submitTriggered = false;
+
+        // --- Player cancel UI ---
+        _playerControls.PlayerUI.CancelInteract.performed += inputInfo => cancelTriggered = true;
+        _playerControls.PlayerUI.CancelInteract.canceled += inputInfo => cancelTriggered = false;
+
+        // --- Mouse position ---
+        _playerControls.PlayerUI.Point.performed += inputInfo => mousePosition = inputInfo.ReadValue<Vector2>();
+        _playerControls.PlayerUI.Point.canceled += inputInfo => mousePosition = Vector2.zero;
 
         _controlsInitialized = true;
     }

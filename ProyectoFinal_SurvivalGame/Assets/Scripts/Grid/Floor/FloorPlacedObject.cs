@@ -65,7 +65,13 @@ public class FloorPlacedObject : MonoBehaviour, IDamagable
         _health -= damage;
 
         if (_health <= 0)
+        {
+            Grid<GridObject> grid = GridManager.Instance.GetGrid(transform.position);
+            grid.GetXZ(transform.position, out int x, out int z);
+            grid.GetGridObject(x, z)?.SetPlacedObject(null);
+
             Destroy(gameObject);
+        }
     }
 
     // Construye un muro nuevo en un borde y avisa al vecino
@@ -191,7 +197,23 @@ public class FloorPlacedObject : MonoBehaviour, IDamagable
         {
             return neighborGridObject.GetPlacedObject().GetComponent<FloorPlacedObject>();
         }
-
         return null;
+    }
+
+    // Booleano para saber si el suelo tien una escalera ya puesta
+    public bool HasAnyStairs()
+    {
+        return IsStairsAtEdge(Edge.Up) || IsStairsAtEdge(Edge.Down) ||
+               IsStairsAtEdge(Edge.Left) || IsStairsAtEdge(Edge.Right);
+    }
+
+    public bool IsStairsAtEdge(Edge edge)
+    {
+        FloorEdgePlacedObject edgeObj = GetEdgeObject(edge);
+
+        if (edgeObj == null)
+            return false;
+
+        return edgeObj.GetSO().isStairs;
     }
 }

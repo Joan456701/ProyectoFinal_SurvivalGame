@@ -1,7 +1,7 @@
 using NUnit.Framework.Constraints;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "ScriptableObjects/BuildingPiece")]
+[CreateAssetMenu(fileName = "Structure Building", menuName = "Building Element/Structure Building")]
 public class BuildingPieceSO : ScriptableObject
 {
     public string nameString; 

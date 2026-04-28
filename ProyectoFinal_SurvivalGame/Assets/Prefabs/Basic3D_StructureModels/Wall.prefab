@@ -200,7 +200,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d3c3904f56c99114bbe8277dc4342fd5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FloorEdgePlacedObject
-  _maxHealth: 3
+  _maxHealth: 1
+  _floorEdgeObjectTypeSO: {fileID: 11400000, guid: 6d9fbe94d238b9c4b8363aee294cc94d, type: 2}
 --- !u!65 &5206259623976344466
 BoxCollider:
   m_ObjectHideFlags: 0

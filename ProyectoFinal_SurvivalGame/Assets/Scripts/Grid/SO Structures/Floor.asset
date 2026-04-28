@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Floor
   m_EditorClassIdentifier: Assembly-CSharp::BuildingPieceSO
   nameString: Floor
-  prefab: {fileID: 4441437744188099715, guid: 23dd389fe94d629498b1e98c9d09d12d, type: 3}
-  ghostPrefab: {fileID: 4441437744188099715, guid: a2678c59d503faf4d87b866319e5ee39, type: 3}
+  prefab: {fileID: 4169915863404240372, guid: 933728fee25a06a4fb0da4f1c61b1f85, type: 3}
+  ghostPrefab: {fileID: 6965880631862569420, guid: a2678c59d503faf4d87b866319e5ee39, type: 3}
   whith: 1
   hieght: 1

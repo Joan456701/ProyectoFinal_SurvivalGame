@@ -14,25 +14,43 @@ public class PlayerInputHandler : MonoBehaviour
     public bool attackTiggered { get; private set; }
     public bool isBuildMode {  get; private set; } = false;
     public bool destroyTriggered { get; private set; }
-    public bool rotateTriggered { get; private set; }
     public bool slot1Triggered { get; private set; }
     public bool slot2Triggered { get; private set; }
     public bool slot3Triggered { get; private set; }
     public bool slot4Triggered { get; private set; }
     public bool slot5Triggered { get; private set; }
-    public bool subdivideTriggered { get; private set; }
-    public bool dropTriggered { get; private set; }
+    public bool subdivideTriggered;
+    public bool dropTriggered;
     public bool dropAllTriggered { get; private set; }
-    public bool dropOneTriggered { get; private set; }
-    public bool dropHalfTriggered { get; private set; }
+    public bool dropOneTriggered;
+    public bool dropHalfTriggered;
     public bool eatTriggered { get; private set; }
-    public bool equipTriggered { get; private set; }
-    public bool inventoryTriggered { get; private set; }
-    public bool undoTriggered { get; private set; }
+    public bool equipTriggered;
+    public bool inventoryTriggered;
+    public bool undoTriggered;
+
+    public bool rotateTriggered;
+    public bool buildingMenu;
+
+
+    //Variables de la interfaz
+    public bool submitTriggered;
+    public bool cancelTriggered;
+    public Vector2 mousePosition;
 
     private void Awake()
     {
         InitializeControls();
+    }
+
+    public void SwitchActionMap(string mapName)
+    {
+        _playerControls.Disable();
+
+        if (mapName == "UI")
+            _playerControls.PlayerUI.Enable();
+        else
+            _playerControls.Player.Enable();
     }
 
     private void InitializeControls()
@@ -62,9 +80,11 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.Player.Sprint.canceled += inputInfo => sprintTriggered = false;
 
         // --- Interactuar ---
+        _playerControls.Player.Interact.performed += inputInfo => interactTriggered = true;
         _playerControls.Player.Interact.canceled += inputInfo => interactTriggered = false;
 
         // --- Attack ---
+        _playerControls.Player.Attack.performed += inputInfo => attackTiggered = true;
         _playerControls.Player.Attack.canceled += inputInfo => attackTiggered = false;
 
         // --- Build ---
@@ -74,76 +94,84 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.Player.DestroyProbisional.performed += inputInfo => destroyTriggered = true;
         _playerControls.Player.DestroyProbisional.canceled += inputInfo => destroyTriggered = false;
 
-        // --- Rotate Objects ---
+        // --- Rotate Structures ---
+        _playerControls.Player.Rotate.performed += inputInfo => rotateTriggered = true;
         _playerControls.Player.Rotate.canceled += inputInfo => rotateTriggered = false;
 
         // --- Slot1 Objects ---
+        _playerControls.Player.Slot1.performed += inputInfo => slot1Triggered = true;
         _playerControls.Player.Slot1.canceled += inputInfo => slot1Triggered = false;
 
         // --- Slot2 Objects ---
+        _playerControls.Player.Slot2.performed += inputInfo => slot2Triggered = true;
         _playerControls.Player.Slot2.canceled += inputInfo => slot2Triggered = false;
 
         // --- slot3 Objects ---
+        _playerControls.Player.Slot3.performed += inputInfo => slot3Triggered = true;
         _playerControls.Player.Slot3.canceled += inputInfo => slot3Triggered = false;
 
         // --- Slot4 Objects ---
+        _playerControls.Player.Slot4.performed += inputInfo => slot4Triggered = true;
         _playerControls.Player.Slot4.canceled += inputInfo => slot4Triggered = false;
 
         // --- Slot5 Objects ---
+        _playerControls.Player.Slot5.performed += inputInfo => slot5Triggered = true;
         _playerControls.Player.Slot5.canceled += inputInfo => slot5Triggered = false;
 
         // --- Subdivide Objects ---
+        _playerControls.Player.Subdivide.performed += inputInfo => subdivideTriggered = true;
         _playerControls.Player.Subdivide.canceled += inputInfo => subdivideTriggered = false;
 
         // --- Drop Objects ---
+        _playerControls.Player.Drop.performed += inputInfo => dropTriggered = true;
         _playerControls.Player.Drop.canceled += inputInfo => dropTriggered = false;
 
         // --- DropAll Objects ---
+        _playerControls.Player.DropAll.performed += inputInfo => dropAllTriggered = true;
         _playerControls.Player.DropAll.canceled += inputInfo => dropAllTriggered = false;
 
         // --- DropOne Objects ---
+        _playerControls.Player.DropOne.performed += inputInfo => dropOneTriggered = true;
         _playerControls.Player.DropOne.canceled += inputInfo => dropOneTriggered = false;
 
         // --- DropHalf Objects ---
+        _playerControls.Player.DropHalf.performed += inputInfo => dropHalfTriggered = true;
         _playerControls.Player.DropHalf.canceled += inputInfo => dropHalfTriggered = false;
 
         // --- Eat Objects ---
+        _playerControls.Player.Eat.performed += inputInfo => eatTriggered = true;
         _playerControls.Player.Eat.canceled += inputInfo => eatTriggered = false;
 
+        // --- Open Building Menu ---
+        _playerControls.Player.BuildingMenu.performed += inputInfo => buildingMenu = true;
+        _playerControls.Player.BuildingMenu.canceled += inputInfo => buildingMenu = false;
+
+        // --- Open Inventory ---
+        _playerControls.Player.OpenInventory.performed += inputInfo => inventoryTriggered = true;
+        _playerControls.Player.OpenInventory.canceled += inputInfo => inventoryTriggered = false;
+
+        // --- Undo ---
+        _playerControls.Player.Undo.performed += inputInfo => undoTriggered = true;
+        _playerControls.Player.Undo.canceled += inputInfo => undoTriggered = false;
+
+        // --- Equip ---
+        _playerControls.Player.Equip.performed += inputInfo => equipTriggered = true;
+        _playerControls.Player.Equip.canceled += inputInfo => equipTriggered = false;
+
+        // --- UI MAP ---
+        // --- Player interact UI ---
+        _playerControls.PlayerUI.InteractUI.performed += inputInfo => submitTriggered = true;
+        _playerControls.PlayerUI.InteractUI.canceled += inputInfo => submitTriggered = false;
+
+        // --- Player cancel UI ---
+        _playerControls.PlayerUI.CancelInteract.performed += inputInfo => cancelTriggered = true;
+        _playerControls.PlayerUI.CancelInteract.canceled += inputInfo => cancelTriggered = false;
+
+        // --- Mouse position ---
+        _playerControls.PlayerUI.Point.performed += inputInfo => mousePosition = inputInfo.ReadValue<Vector2>();
+        _playerControls.PlayerUI.Point.canceled += inputInfo => mousePosition = Vector2.zero;
+
         _controlsInitialized = true;
-    }
-
-    private void Update()
-    {
-        if (_playerControls != null)
-        {
-            interactTriggered = _playerControls.Player.Interact.WasPressedThisFrame();
-            attackTiggered = _playerControls.Player.Attack.WasPressedThisFrame();
-            rotateTriggered = _playerControls.Player.Rotate.WasPressedThisFrame();
-            slot1Triggered = _playerControls.Player.Slot1.WasPressedThisFrame();
-            slot2Triggered = _playerControls.Player.Slot2.WasPressedThisFrame();
-            slot3Triggered = _playerControls.Player.Slot3.WasPressedThisFrame();
-            slot4Triggered = _playerControls.Player.Slot4.WasPressedThisFrame();
-            slot5Triggered = _playerControls.Player.Slot5.WasPressedThisFrame();
-            subdivideTriggered = _playerControls.Player.Subdivide.WasPressedThisFrame();
-            dropTriggered = _playerControls.Player.Drop.WasPressedThisFrame();
-            dropAllTriggered = _playerControls.Player.DropAll.WasPressedThisFrame();
-            dropOneTriggered = _playerControls.Player.DropOne.WasPressedThisFrame();
-            dropHalfTriggered = _playerControls.Player.DropHalf.WasPressedThisFrame();
-            eatTriggered = _playerControls.Player.Eat.WasPressedThisFrame();
-        }
-
-        if (Keyboard.current == null)
-        {
-            inventoryTriggered = false;
-            undoTriggered = false;
-            equipTriggered = false;
-            return;
-        }
-
-        inventoryTriggered = Keyboard.current.iKey.wasPressedThisFrame;
-        undoTriggered = (Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed) && Keyboard.current.zKey.wasPressedThisFrame;
-        equipTriggered = Keyboard.current.tKey.wasPressedThisFrame;
     }
 
     private void OnEnable()

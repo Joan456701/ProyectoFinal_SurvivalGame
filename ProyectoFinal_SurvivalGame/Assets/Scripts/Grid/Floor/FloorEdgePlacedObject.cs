@@ -5,6 +5,8 @@ public class FloorEdgePlacedObject : MonoBehaviour, IDamagable
     [Header("Vida Estructura")]
     [SerializeField] private int _maxHealth;
     private int _health;
+
+    [SerializeField] private FloorEdgeObjectTypeSO _floorEdgeObjectTypeSO;
     void Start()
     {
         _health = _maxHealth;
@@ -23,4 +25,5 @@ public class FloorEdgePlacedObject : MonoBehaviour, IDamagable
             Destroy(gameObject);
         }
     }
+    public FloorEdgeObjectTypeSO GetSO() => _floorEdgeObjectTypeSO;
 }

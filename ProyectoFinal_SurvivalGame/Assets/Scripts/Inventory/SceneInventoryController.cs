@@ -49,6 +49,21 @@ public class SceneInventoryController : MonoBehaviour
         public int activeHotbarSlotIndex;
     }
 
+    [Serializable]
+    private class RecipeRequirement
+    {
+        public string itemId;
+        public int amount;
+    }
+
+    [Serializable]
+    private class CraftingRecipe
+    {
+        public string resultItemId;
+        public int resultAmount;
+        public List<RecipeRequirement> requirements = new List<RecipeRequirement>();
+    }
+
     private sealed class SlotUI
     {
         public int Index;
@@ -57,6 +72,36 @@ public class SceneInventoryController : MonoBehaviour
         public Text AmountLabel;
         public Text ShortcutLabel;
     }
+
+    private sealed class CraftingRecipeUI
+    {
+        public CraftingRecipe Recipe;
+        public Text NameLabel;
+        public Text RequirementsLabel;
+        public Text StatusLabel;
+        public Button CreateButton;
+        public Image ButtonImage;
+    }
+
+    private sealed class TransferSlotUI
+    {
+        public int Index;
+        public Image Background;
+        public Image Icon;
+        public Text AmountLabel;
+        public Text Label;
+        public Button Button;
+    }
+
+    private enum ChestTransferContext
+    {
+        None,
+        Inventory,
+        Chest
+    }
+
+    private static SceneInventoryController _instance;
+    public static SceneInventoryController Instance => _instance;
 
     private readonly Stack<InventoryState> _undoStack = new Stack<InventoryState>();
     private const int MaxUndoHistory = 50;
@@ -84,32 +129,57 @@ public class SceneInventoryController : MonoBehaviour
     [SerializeField] private Color _bodyTextColor = new Color(0.84f, 0.88f, 0.92f);
     [SerializeField] private Color _shortcutTextColor = new Color(0.75f, 0.86f, 0.96f);
     [SerializeField] private Color _pickupPromptColor = Color.white;
+    [SerializeField] private Color _craftReadyButtonColor = new Color(0.18f, 0.62f, 0.31f, 1f);
+    [SerializeField] private Color _craftDisabledButtonColor = new Color(0.28f, 0.31f, 0.35f, 1f);
 
     private readonly List<InventorySlot> _slots = new List<InventorySlot>();
     private readonly List<SlotUI> _inventorySlotUIs = new List<SlotUI>();
     private readonly List<SlotUI> _hotbarSlotUIs = new List<SlotUI>();
+    private readonly List<CraftingRecipe> _craftingRecipes = new List<CraftingRecipe>();
+    private readonly List<CraftingRecipeUI> _craftingRecipeUIs = new List<CraftingRecipeUI>();
+    private readonly List<TransferSlotUI> _chestStorageSlotUIs = new List<TransferSlotUI>();
+    private readonly List<TransferSlotUI> _chestInventorySlotUIs = new List<TransferSlotUI>();
     private readonly Dictionary<string, InventoryItemDefinition> _itemCatalog = new Dictionary<string, InventoryItemDefinition>();
 
     private Font _defaultFont;
     private GameObject _inventoryPanel;
     private GameObject _hotbarPanel;
+    private GameObject _craftingWindow;
+    private GameObject _chestWindow;
     private GameObject _crosshair;
     private Text _detailTitle;
     private Text _detailAmount;
     private Text _detailDescription;
     private Text _pickupPromptText;
+    private Text _craftingHintText;
+    private Text _chestHintText;
     private GameObject _heldItemVisual;
     private GameObject _generatedUiRoot;
     private Image _dragIcon;
     private bool _inventoryOpen;
+    private bool _craftingStationOpen;
+    private bool _chestOpen;
     private int _selectedSlotIndex;
     private int _activeHotbarSlotIndex;
     private string _heldItemId = string.Empty;
     private int _draggedSlotIndex = -1;
+    private ChestTransferContext _draggedChestTransferContext = ChestTransferContext.None;
+    private int _draggedChestTransferSlotIndex = -1;
     private bool _editorPreviewRefreshQueued;
+    private SceneChest _openedChest;
+
+    private bool IsAnyMenuOpen()
+    {
+        return _inventoryOpen || _craftingStationOpen || _chestOpen;
+    }
 
     private void Awake()
     {
+        if (_instance == null)
+        {
+            _instance = this;
+        }
+
         if (_playerInputHandler == null)
         {
             _playerInputHandler = FindFirstObjectByType<PlayerInputHandler>();
@@ -151,8 +221,9 @@ public class SceneInventoryController : MonoBehaviour
     {
         _defaultFont = _uiFont != null ? _uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-        InitializeSlots();
         BuildCatalog();
+        BuildCraftingRecipes();
+        InitializeSlots();
         SeedInventory();
         BuildInventoryUI();
         SelectSlot(0);
@@ -233,7 +304,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleUndoShortcut()
     {
-        if (_playerInputHandler != null && _playerInputHandler.undoTriggered)
+        if (!_craftingStationOpen && !_chestOpen && _playerInputHandler != null && _playerInputHandler.undoTriggered)
         {
             Undo();
         }
@@ -241,7 +312,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleEatFoodShortcut()
     {
-        if (_playerInputHandler != null && _playerInputHandler.eatTriggered)
+        if (!_craftingStationOpen && !_chestOpen && _playerInputHandler != null && _playerInputHandler.eatTriggered)
         {
             int slotIndexToEat = -1;
 
@@ -381,11 +452,28 @@ public class SceneInventoryController : MonoBehaviour
             return;
         }
 
-        _pickupPromptText.gameObject.SetActive(shouldShow && !_inventoryOpen);
+        _pickupPromptText.gameObject.SetActive(shouldShow && !IsAnyMenuOpen());
         if (shouldShow)
         {
             _pickupPromptText.text = promptText;
         }
+    }
+
+    public void OpenCraftingStation()
+    {
+        SetCraftingOpen(true, true);
+    }
+
+    public void OpenChest(SceneChest chest)
+    {
+        if (chest == null)
+        {
+            return;
+        }
+
+        chest.EnsureInitialized();
+        _openedChest = chest;
+        SetChestOpen(true, true);
     }
 
     public void BeginSlotDrag(int slotIndex)
@@ -470,10 +558,28 @@ public class SceneInventoryController : MonoBehaviour
         RegisterItem("alien_fiber", "Fibra alienigena", "Material vegetal flexible. Ideal para futuras recetas de cuerda, vendas y piezas blandas.", new Color(0.45f, 0.9f, 0.55f), 25, PrimitiveType.Capsule, new Vector3(0.45f, 0.45f, 0.45f));
         RegisterItem("ferrite_stone", "Piedra ferrita", "Roca densa y resistente. Base perfecta para construccion y herramientas primitivas.", new Color(0.72f, 0.75f, 0.8f), 30, PrimitiveType.Cube, new Vector3(0.7f, 0.7f, 0.7f));
         RegisterItem("stone", "Piedra", "Fragmento mineral recogido del entorno. Puede utilizarse como recurso basico para supervivencia y construccion.", new Color(0.62f, 0.64f, 0.68f), 30, PrimitiveType.Cube, new Vector3(1f, 1f, 1f));
+        RegisterItem("wood", "Madera", "Bloque de madera basica. Materia prima para crear herramientas y componentes simples.", new Color(0.54f, 0.35f, 0.18f), 25, PrimitiveType.Cube, new Vector3(1f, 1f, 1f));
+        RegisterItem("stick", "Palos", "Palo resistente y ligero. Util para mangos, lanzas y estructuras improvisadas.", new Color(0.64f, 0.49f, 0.24f), 25, PrimitiveType.Cylinder, new Vector3(0.22f, 1.1f, 0.22f));
+        RegisterItem("leaf", "Hojas", "Hojas grandes del planeta. Sirven para fabricar cuerda y otros materiales vegetales.", new Color(0.33f, 0.74f, 0.31f), 30, PrimitiveType.Sphere, new Vector3(0.8f, 0.25f, 0.8f));
+        RegisterItem("rope", "Cuerda", "Trenzado vegetal util para unir piezas y fabricar herramientas.", new Color(0.77f, 0.68f, 0.39f), 20, PrimitiveType.Capsule, new Vector3(0.35f, 0.75f, 0.35f));
+        RegisterItem("pickaxe", "Pico", "Herramienta de recoleccion improvisada creada en la mesa de crafteo.", new Color(0.7f, 0.7f, 0.74f), 1, PrimitiveType.Cube, new Vector3(0.95f, 0.95f, 0.95f));
+        RegisterItem("spear", "Lanza", "Arma sencilla de supervivencia montada con materiales del entorno.", new Color(0.82f, 0.74f, 0.61f), 1, PrimitiveType.Cylinder, new Vector3(0.18f, 1.35f, 0.18f));
+        RegisterItem("axe", "Hacha", "Herramienta pesada para tala y combate cercano.", new Color(0.56f, 0.56f, 0.6f), 1, PrimitiveType.Cube, new Vector3(0.9f, 0.9f, 0.9f));
         RegisterItem("luminous_resin", "Resina luminosa", "Compuesto organico con brillo natural. Puede servir mas adelante para antorchas y adhesivos.", new Color(0.3f, 0.95f, 1f), 15, PrimitiveType.Sphere, new Vector3(0.55f, 0.55f, 0.55f));
         RegisterItem("purified_water", "Agua purificada", "Suministro basico de supervivencia. Conviene reservarla para expediciones largas.", new Color(0.45f, 0.7f, 1f), 10, PrimitiveType.Cylinder, new Vector3(0.45f, 0.6f, 0.45f));
         RegisterItem("Comida", "Comida", "Comida которую puedes consumir para recuperar hambre.", new Color(1f, 0.68f, 0.28f), 10, PrimitiveType.Sphere, new Vector3(0.5f, 0.5f, 0.5f));
         RegisterItem("Bombona", "Bombona de oxigeno", "Tanque de oxigeno. Se acabara el tiempo, moriras.", new Color(0.2f, 0.8f, 1f), 1, PrimitiveType.Capsule, new Vector3(0.3f, 0.6f, 0.3f));
+        RegisterItem("carbon", "Carbon", "Material combustible. Se usa para rellenar la gasolina en la GasoilStation.", new Color(0.25f, 0.25f, 0.25f), 20, PrimitiveType.Cube, new Vector3(0.6f, 0.6f, 0.6f));
+    }
+
+    private void BuildCraftingRecipes()
+    {
+        _craftingRecipes.Clear();
+        RegisterCraftingRecipe("stick", 2, ("wood", 1));
+        RegisterCraftingRecipe("pickaxe", 1, ("wood", 3), ("rope", 2));
+        RegisterCraftingRecipe("spear", 1, ("stick", 2), ("stone", 1), ("rope", 1));
+        RegisterCraftingRecipe("axe", 1, ("stick", 2), ("stone", 3), ("rope", 1));
+        RegisterCraftingRecipe("rope", 1, ("leaf", 2));
     }
 
     private void RegisterItem(string itemId, string displayName, string description, Color color, int maxStack, PrimitiveType worldPrimitiveType, Vector3 worldScale)
@@ -501,11 +607,16 @@ public class SceneInventoryController : MonoBehaviour
 
     private bool CanStoreItemAmount(InventoryItemDefinition definition, int amount)
     {
+        return CanStoreItemAmount(definition, amount, _slots);
+    }
+
+    private bool CanStoreItemAmount(InventoryItemDefinition definition, int amount, List<InventorySlot> slotsToEvaluate)
+    {
         int availableCapacity = 0;
 
-        for (int i = 0; i < _slots.Count; i++)
+        for (int i = 0; i < slotsToEvaluate.Count; i++)
         {
-            InventorySlot slot = _slots[i];
+            InventorySlot slot = slotsToEvaluate[i];
 
             if (slot.IsEmpty)
             {
@@ -529,12 +640,29 @@ public class SceneInventoryController : MonoBehaviour
             return;
         }
 
+        if (_craftingStationOpen)
+        {
+            SetCraftingOpen(false);
+            return;
+        }
+
+        if (_chestOpen)
+        {
+            SetChestOpen(false);
+            return;
+        }
+
         SetInventoryOpen(!_inventoryOpen);
     }
 
     private void HandleHotbarShortcuts()
     {
         if (_playerInputHandler == null)
+        {
+            return;
+        }
+
+        if (_craftingStationOpen || _chestOpen)
         {
             return;
         }
@@ -548,7 +676,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleDropShortcut()
     {
-        if (!_inventoryOpen || _playerInputHandler == null || !_playerInputHandler.dropTriggered)
+        if (!_inventoryOpen || _craftingStationOpen || _chestOpen || _playerInputHandler == null || !_playerInputHandler.dropTriggered)
         {
             return;
         }
@@ -558,7 +686,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleEquipShortcut()
     {
-        if (!_inventoryOpen || _playerInputHandler == null || !_playerInputHandler.equipTriggered)
+        if (!_inventoryOpen || _craftingStationOpen || _chestOpen || _playerInputHandler == null || !_playerInputHandler.equipTriggered)
         {
             return;
         }
@@ -568,7 +696,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleSplitShortcut()
     {
-        if (!_inventoryOpen || _playerInputHandler == null || !_playerInputHandler.subdivideTriggered)
+        if (!_inventoryOpen || _craftingStationOpen || _chestOpen || _playerInputHandler == null || !_playerInputHandler.subdivideTriggered)
         {
             return;
         }
@@ -578,7 +706,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleHeldItemDropShortcuts()
     {
-        if (_inventoryOpen || _playerInputHandler == null)
+        if (IsAnyMenuOpen() || _playerInputHandler == null)
         {
             return;
         }
@@ -607,41 +735,103 @@ public class SceneInventoryController : MonoBehaviour
         }
 
         _inventoryOpen = isOpen;
+        if (_inventoryOpen)
+        {
+            _craftingStationOpen = false;
+            _chestOpen = false;
+            _openedChest = null;
+        }
+
+        ApplyMenuState(forceRefresh);
+    }
+
+    private void SetCraftingOpen(bool isOpen, bool forceRefresh = false)
+    {
+        if (!forceRefresh && _craftingStationOpen == isOpen)
+        {
+            return;
+        }
+
+        _craftingStationOpen = isOpen;
+        if (_craftingStationOpen)
+        {
+            _inventoryOpen = false;
+            _chestOpen = false;
+            _openedChest = null;
+        }
+
+        ApplyMenuState(forceRefresh);
+    }
+
+    private void SetChestOpen(bool isOpen, bool forceRefresh = false)
+    {
+        if (!forceRefresh && _chestOpen == isOpen)
+        {
+            return;
+        }
+
+        _chestOpen = isOpen;
+        if (_chestOpen)
+        {
+            _inventoryOpen = false;
+            _craftingStationOpen = false;
+        }
+        else
+        {
+            _openedChest = null;
+        }
+
+        ApplyMenuState(forceRefresh);
+    }
+
+    private void ApplyMenuState(bool forceRefresh = false)
+    {
+        bool anyMenuOpen = IsAnyMenuOpen();
 
         if (_inventoryPanel != null)
         {
             _inventoryPanel.SetActive(_inventoryOpen);
         }
 
+        if (_craftingWindow != null)
+        {
+            _craftingWindow.SetActive(_craftingStationOpen);
+        }
+
+        if (_chestWindow != null)
+        {
+            _chestWindow.SetActive(_chestOpen);
+        }
+
         if (_crosshair != null)
         {
-            _crosshair.SetActive(!_inventoryOpen);
+            _crosshair.SetActive(!anyMenuOpen);
         }
 
         SetPickupPrompt(false, string.Empty);
 
         if (Application.isPlaying && _firstPersonController != null)
         {
-            _firstPersonController.enabled = !_inventoryOpen;
+            _firstPersonController.enabled = !anyMenuOpen;
         }
 
         if (Application.isPlaying && _firstPersonBuilder != null)
         {
-            _firstPersonBuilder.enabled = !_inventoryOpen;
+            _firstPersonBuilder.enabled = !anyMenuOpen;
         }
 
         if (Application.isPlaying)
         {
-            Cursor.lockState = _inventoryOpen ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible = _inventoryOpen;
+            Cursor.lockState = anyMenuOpen ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = anyMenuOpen;
         }
 
-        if (!_inventoryOpen && EventSystem.current != null)
+        if (!anyMenuOpen && EventSystem.current != null)
         {
             EventSystem.current.SetSelectedGameObject(null);
         }
 
-        if (!_inventoryOpen)
+        if (!anyMenuOpen)
         {
             RefreshHeldItemFromHotbarSelection();
         }
@@ -759,6 +949,145 @@ public class SceneInventoryController : MonoBehaviour
         _detailDescription.verticalOverflow = VerticalWrapMode.Overflow;
         SetRect(_detailDescription.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, 18f), new Vector2(-18f, -168f));
 
+        _craftingWindow = CreatePanel("CraftingWindow", _generatedUiRoot.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(860f, 620f), _inventoryPanelColor);
+
+        GameObject craftingHeader = CreateUIObject("CraftingHeader", _craftingWindow.transform);
+        RectTransform craftingHeaderRect = craftingHeader.GetComponent<RectTransform>();
+        StretchHorizontally(craftingHeaderRect, 24f, -24f, -24f, 78f);
+        CreateText("Title", craftingHeader.transform, "Mesa de crafteo", 32, TextAnchor.MiddleLeft, FontStyle.Bold, _titleTextColor);
+        _craftingHintText = CreateText("Hint", craftingHeader.transform, "Lista completa de objetos crafteables. El boton Crear solo se activa si tienes todos los materiales.", 18, TextAnchor.LowerLeft, FontStyle.Normal, _hintTextColor);
+
+        RectTransform craftingTitleRect = craftingHeader.transform.GetChild(0).GetComponent<RectTransform>();
+        craftingTitleRect.anchorMin = new Vector2(0f, 0.45f);
+        craftingTitleRect.anchorMax = new Vector2(1f, 1f);
+        craftingTitleRect.offsetMin = Vector2.zero;
+        craftingTitleRect.offsetMax = Vector2.zero;
+
+        RectTransform craftingHintRect = craftingHeader.transform.GetChild(1).GetComponent<RectTransform>();
+        craftingHintRect.anchorMin = new Vector2(0f, 0f);
+        craftingHintRect.anchorMax = new Vector2(1f, 0.45f);
+        craftingHintRect.offsetMin = Vector2.zero;
+        craftingHintRect.offsetMax = Vector2.zero;
+
+        GameObject craftingBody = CreatePanel("CraftingBody", _craftingWindow.transform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero, _sectionPanelColor);
+        RectTransform craftingBodyRect = craftingBody.GetComponent<RectTransform>();
+        craftingBodyRect.offsetMin = new Vector2(24f, 24f);
+        craftingBodyRect.offsetMax = new Vector2(-24f, -112f);
+
+        GameObject recipeViewport = CreateUIObject("RecipeViewport", craftingBody.transform);
+        RectTransform recipeViewportRect = recipeViewport.GetComponent<RectTransform>();
+        SetRect(recipeViewportRect, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(12f, 12f), new Vector2(-12f, -12f));
+        Image recipeViewportImage = recipeViewport.AddComponent<Image>();
+        recipeViewportImage.color = new Color(0f, 0f, 0f, 0.08f);
+        Mask recipeMask = recipeViewport.AddComponent<Mask>();
+        recipeMask.showMaskGraphic = false;
+
+        GameObject recipeContent = CreateUIObject("RecipeContent", recipeViewport.transform);
+        RectTransform recipeContentRect = recipeContent.GetComponent<RectTransform>();
+        recipeContentRect.anchorMin = new Vector2(0f, 1f);
+        recipeContentRect.anchorMax = new Vector2(1f, 1f);
+        recipeContentRect.pivot = new Vector2(0.5f, 1f);
+        recipeContentRect.offsetMin = new Vector2(0f, 0f);
+        recipeContentRect.offsetMax = new Vector2(0f, 0f);
+
+        VerticalLayoutGroup recipeLayout = recipeContent.AddComponent<VerticalLayoutGroup>();
+        recipeLayout.padding = new RectOffset(2, 2, 2, 2);
+        recipeLayout.spacing = 10f;
+        recipeLayout.childAlignment = TextAnchor.UpperCenter;
+        recipeLayout.childControlWidth = true;
+        recipeLayout.childControlHeight = false;
+        recipeLayout.childForceExpandWidth = true;
+        recipeLayout.childForceExpandHeight = false;
+
+        ContentSizeFitter recipeFitter = recipeContent.AddComponent<ContentSizeFitter>();
+        recipeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        ScrollRect recipeScroll = _craftingWindow.AddComponent<ScrollRect>();
+        recipeScroll.viewport = recipeViewportRect;
+        recipeScroll.content = recipeContentRect;
+        recipeScroll.horizontal = false;
+        recipeScroll.vertical = true;
+        recipeScroll.scrollSensitivity = 20f;
+
+        _craftingRecipeUIs.Clear();
+        for (int i = 0; i < _craftingRecipes.Count; i++)
+        {
+            _craftingRecipeUIs.Add(CreateCraftingRecipeUI(recipeContent.transform, _craftingRecipes[i]));
+        }
+
+        _chestWindow = CreatePanel("ChestWindow", _generatedUiRoot.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(980f, 620f), _inventoryPanelColor);
+
+        GameObject chestHeader = CreateUIObject("ChestHeader", _chestWindow.transform);
+        RectTransform chestHeaderRect = chestHeader.GetComponent<RectTransform>();
+        StretchHorizontally(chestHeaderRect, 24f, -24f, -24f, 78f);
+        CreateText("Title", chestHeader.transform, "Cofre", 32, TextAnchor.MiddleLeft, FontStyle.Bold, _titleTextColor);
+        _chestHintText = CreateText("Hint", chestHeader.transform, "Pulsa en un slot de tu inventario para guardarlo en el cofre. Pulsa en un slot del cofre para llevarlo a tu inventario.", 18, TextAnchor.LowerLeft, FontStyle.Normal, _hintTextColor);
+
+        RectTransform chestTitleRect = chestHeader.transform.GetChild(0).GetComponent<RectTransform>();
+        chestTitleRect.anchorMin = new Vector2(0f, 0.45f);
+        chestTitleRect.anchorMax = new Vector2(1f, 1f);
+        chestTitleRect.offsetMin = Vector2.zero;
+        chestTitleRect.offsetMax = Vector2.zero;
+
+        RectTransform chestHintRect = chestHeader.transform.GetChild(1).GetComponent<RectTransform>();
+        chestHintRect.anchorMin = new Vector2(0f, 0f);
+        chestHintRect.anchorMax = new Vector2(1f, 0.45f);
+        chestHintRect.offsetMin = Vector2.zero;
+        chestHintRect.offsetMax = Vector2.zero;
+
+        GameObject chestBody = CreateUIObject("ChestBody", _chestWindow.transform);
+        RectTransform chestBodyRect = chestBody.GetComponent<RectTransform>();
+        chestBodyRect.anchorMin = new Vector2(0f, 0f);
+        chestBodyRect.anchorMax = new Vector2(1f, 1f);
+        chestBodyRect.offsetMin = new Vector2(24f, 24f);
+        chestBodyRect.offsetMax = new Vector2(-24f, -112f);
+
+        GameObject chestStoragePanel = CreatePanel("ChestStoragePanel", chestBody.transform, new Vector2(0f, 0f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero, _sectionPanelColor);
+        RectTransform chestStorageRect = chestStoragePanel.GetComponent<RectTransform>();
+        chestStorageRect.offsetMin = new Vector2(0f, 0f);
+        chestStorageRect.offsetMax = new Vector2(-10f, 0f);
+        CreateText("StorageTitle", chestStoragePanel.transform, "Contenido del cofre", 24, TextAnchor.UpperLeft, FontStyle.Bold, _titleTextColor);
+        SetRect(chestStoragePanel.transform.GetChild(0).GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -44f), new Vector2(-18f, -10f));
+
+        GameObject chestStorageGrid = CreateUIObject("ChestStorageGrid", chestStoragePanel.transform);
+        RectTransform chestStorageGridRect = chestStorageGrid.GetComponent<RectTransform>();
+        SetRect(chestStorageGridRect, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, 18f), new Vector2(-18f, -62f));
+        GridLayoutGroup chestStorageLayout = chestStorageGrid.AddComponent<GridLayoutGroup>();
+        chestStorageLayout.cellSize = new Vector2(96f, 96f);
+        chestStorageLayout.spacing = new Vector2(10f, 10f);
+        chestStorageLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        chestStorageLayout.constraintCount = 4;
+        chestStorageLayout.childAlignment = TextAnchor.UpperLeft;
+
+        GameObject chestInventoryPanel = CreatePanel("ChestInventoryPanel", chestBody.transform, new Vector2(0.5f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero, _sectionPanelColor);
+        RectTransform chestInventoryRect = chestInventoryPanel.GetComponent<RectTransform>();
+        chestInventoryRect.offsetMin = new Vector2(10f, 0f);
+        chestInventoryRect.offsetMax = new Vector2(0f, 0f);
+        CreateText("InventoryTitle", chestInventoryPanel.transform, "Tu inventario", 24, TextAnchor.UpperLeft, FontStyle.Bold, _titleTextColor);
+        SetRect(chestInventoryPanel.transform.GetChild(0).GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -44f), new Vector2(-18f, -10f));
+
+        GameObject chestInventoryGrid = CreateUIObject("ChestInventoryGrid", chestInventoryPanel.transform);
+        RectTransform chestInventoryGridRect = chestInventoryGrid.GetComponent<RectTransform>();
+        SetRect(chestInventoryGridRect, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(18f, 18f), new Vector2(-18f, -62f));
+        GridLayoutGroup chestInventoryLayout = chestInventoryGrid.AddComponent<GridLayoutGroup>();
+        chestInventoryLayout.cellSize = new Vector2(96f, 96f);
+        chestInventoryLayout.spacing = new Vector2(10f, 10f);
+        chestInventoryLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        chestInventoryLayout.constraintCount = 4;
+        chestInventoryLayout.childAlignment = TextAnchor.UpperLeft;
+
+        _chestStorageSlotUIs.Clear();
+        for (int i = 0; i < 12; i++)
+        {
+            _chestStorageSlotUIs.Add(CreateTransferSlotUI(chestStorageGrid.transform, i, true));
+        }
+
+        _chestInventorySlotUIs.Clear();
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            _chestInventorySlotUIs.Add(CreateTransferSlotUI(chestInventoryGrid.transform, i, false));
+        }
+
         _hotbarPanel = CreatePanel("HotbarPanel", _generatedUiRoot.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 64f), new Vector2(620f, 112f), _hotbarPanelColor);
         HorizontalLayoutGroup hotbarLayout = _hotbarPanel.AddComponent<HorizontalLayoutGroup>();
         hotbarLayout.padding = new RectOffset(16, 16, 16, 16);
@@ -824,6 +1153,53 @@ public class SceneInventoryController : MonoBehaviour
         };
     }
 
+    private TransferSlotUI CreateTransferSlotUI(Transform parent, int slotIndex, bool isChestStorage)
+    {
+        GameObject slotRoot = CreateUIObject("TransferSlot_" + slotIndex, parent);
+        RectTransform slotRect = slotRoot.GetComponent<RectTransform>();
+        slotRect.sizeDelta = new Vector2(96f, 96f);
+
+        Image background = slotRoot.AddComponent<Image>();
+        background.color = _slotColor;
+
+        Button button = slotRoot.AddComponent<Button>();
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = Color.white;
+        colors.pressedColor = Color.white;
+        colors.selectedColor = Color.white;
+        colors.disabledColor = Color.white;
+        button.colors = colors;
+
+        ChestTransferSlotDragHandler dragHandler = slotRoot.AddComponent<ChestTransferSlotDragHandler>();
+        dragHandler.Initialize(this, slotIndex, isChestStorage);
+
+        GameObject iconObject = CreateUIObject("Icon", slotRoot.transform);
+        Image icon = iconObject.AddComponent<Image>();
+        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.anchorMin = new Vector2(0f, 0f);
+        iconRect.anchorMax = new Vector2(1f, 1f);
+        iconRect.offsetMin = new Vector2(14f, 14f);
+        iconRect.offsetMax = new Vector2(-14f, -26f);
+        icon.enabled = false;
+
+        Text amountLabel = CreateText("Amount", slotRoot.transform, string.Empty, 18, TextAnchor.LowerRight, FontStyle.Bold, _titleTextColor);
+        SetRect(amountLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(8f, 4f), new Vector2(-8f, 24f));
+
+        Text slotLabel = CreateText("Label", slotRoot.transform, (slotIndex + 1).ToString(), 14, TextAnchor.UpperLeft, FontStyle.Bold, _shortcutTextColor);
+        SetRect(slotLabel.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(8f, -22f), new Vector2(28f, -6f));
+
+        return new TransferSlotUI
+        {
+            Index = slotIndex,
+            Background = background,
+            Icon = icon,
+            AmountLabel = amountLabel,
+            Label = slotLabel,
+            Button = button
+        };
+    }
+
     private void RefreshUI()
     {
         for (int i = 0; i < _inventorySlotUIs.Count; i++)
@@ -836,6 +1212,8 @@ public class SceneInventoryController : MonoBehaviour
             UpdateSlotVisual(_hotbarSlotUIs[i]);
         }
 
+        RefreshCraftingPanel();
+        RefreshChestPanel();
         RefreshDetailsPanel();
     }
 
@@ -1312,8 +1690,9 @@ public class SceneInventoryController : MonoBehaviour
     private void EnsureEditorPreviewUI()
     {
         _defaultFont = _uiFont != null ? _uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        InitializeSlots();
         BuildCatalog();
+        BuildCraftingRecipes();
+        InitializeSlots();
         BuildInventoryUI();
         _selectedSlotIndex = Mathf.Clamp(_selectedSlotIndex, 0, Mathf.Max(0, _inventorySize - 1));
         _activeHotbarSlotIndex = Mathf.Clamp(_activeHotbarSlotIndex, 0, Mathf.Max(0, _hotbarSize - 1));
@@ -1416,6 +1795,602 @@ public class SceneInventoryController : MonoBehaviour
         return text;
     }
 
+    private void RegisterCraftingRecipe(string resultItemId, int resultAmount, params (string itemId, int amount)[] requirements)
+    {
+        CraftingRecipe recipe = new CraftingRecipe
+        {
+            resultItemId = resultItemId,
+            resultAmount = resultAmount
+        };
+
+        for (int i = 0; i < requirements.Length; i++)
+        {
+            recipe.requirements.Add(new RecipeRequirement
+            {
+                itemId = requirements[i].itemId,
+                amount = requirements[i].amount
+            });
+        }
+
+        _craftingRecipes.Add(recipe);
+    }
+
+    private CraftingRecipeUI CreateCraftingRecipeUI(Transform parent, CraftingRecipe recipe)
+    {
+        GameObject rowRoot = CreatePanel("Recipe_" + recipe.resultItemId, parent, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(0f, 118f), new Color(1f, 1f, 1f, 0.05f));
+        LayoutElement rowLayout = rowRoot.AddComponent<LayoutElement>();
+        rowLayout.preferredHeight = 118f;
+
+        Text nameLabel = CreateText("Name", rowRoot.transform, GetItemDisplayName(recipe.resultItemId), 22, TextAnchor.UpperLeft, FontStyle.Bold, _titleTextColor);
+        SetRect(nameLabel.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(14f, -38f), new Vector2(-136f, -10f));
+
+        Text requirementsLabel = CreateText("Requirements", rowRoot.transform, string.Empty, 16, TextAnchor.UpperLeft, FontStyle.Normal, _bodyTextColor);
+        requirementsLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+        requirementsLabel.verticalOverflow = VerticalWrapMode.Overflow;
+        SetRect(requirementsLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(14f, 12f), new Vector2(-136f, -40f));
+
+        Text statusLabel = CreateText("Status", rowRoot.transform, string.Empty, 15, TextAnchor.LowerLeft, FontStyle.Bold, _hintTextColor);
+        SetRect(statusLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(14f, 10f), new Vector2(-136f, 30f));
+
+        Button createButton = CreateButton("CreateButton", rowRoot.transform, "Crear");
+        RectTransform buttonRect = createButton.GetComponent<RectTransform>();
+        SetRect(buttonRect, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-108f, -24f), new Vector2(-14f, 24f));
+
+        createButton.onClick.AddListener(delegate { TryCraftRecipe(recipe); });
+
+        return new CraftingRecipeUI
+        {
+            Recipe = recipe,
+            NameLabel = nameLabel,
+            RequirementsLabel = requirementsLabel,
+            StatusLabel = statusLabel,
+            CreateButton = createButton,
+            ButtonImage = createButton.GetComponent<Image>()
+        };
+    }
+
+    private Button CreateButton(string name, Transform parent, string label)
+    {
+        GameObject buttonObject = CreateUIObject(name, parent);
+        Image buttonImage = buttonObject.AddComponent<Image>();
+        buttonImage.color = _craftDisabledButtonColor;
+
+        Button button = buttonObject.AddComponent<Button>();
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = Color.white;
+        colors.pressedColor = Color.white;
+        colors.selectedColor = Color.white;
+        colors.disabledColor = Color.white;
+        button.colors = colors;
+
+        Text buttonLabel = CreateText("Label", buttonObject.transform, label, 18, TextAnchor.MiddleCenter, FontStyle.Bold, _titleTextColor);
+        SetRect(buttonLabel.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+
+        return button;
+    }
+
+    private void RefreshCraftingPanel()
+    {
+        if (_craftingWindow == null)
+        {
+            return;
+        }
+
+        _craftingWindow.SetActive(_craftingStationOpen);
+
+        if (_craftingHintText != null)
+        {
+            _craftingHintText.text = "Lista completa de objetos crafteables. I cierra la mesa de crafteo. Crear solo se activa si tienes todos los materiales.";
+        }
+
+        for (int i = 0; i < _craftingRecipeUIs.Count; i++)
+        {
+            CraftingRecipeUI recipeUI = _craftingRecipeUIs[i];
+            bool canCraft = _craftingStationOpen && CanCraftRecipe(recipeUI.Recipe);
+            recipeUI.RequirementsLabel.text = BuildRecipeRequirementText(recipeUI.Recipe);
+            recipeUI.StatusLabel.text = canCraft ? "Materiales completos" : "Te faltan materiales";
+            recipeUI.StatusLabel.color = canCraft ? _craftReadyButtonColor : _hintTextColor;
+            recipeUI.CreateButton.interactable = canCraft;
+            if (recipeUI.ButtonImage != null)
+            {
+                recipeUI.ButtonImage.color = canCraft ? _craftReadyButtonColor : _craftDisabledButtonColor;
+            }
+        }
+    }
+
+    private void RefreshChestPanel()
+    {
+        if (_chestWindow == null)
+        {
+            return;
+        }
+
+        _chestWindow.SetActive(_chestOpen);
+
+        if (_chestHintText != null)
+        {
+            _chestHintText.text = _openedChest == null
+                ? "No hay ningun cofre abierto."
+                : "Pulsa en un slot de tu inventario para guardarlo en el cofre. Pulsa en un slot del cofre para recuperarlo.";
+        }
+
+        for (int i = 0; i < _chestInventorySlotUIs.Count; i++)
+        {
+            UpdateTransferSlotVisual(_chestInventorySlotUIs[i], i < _slots.Count ? _slots[i].item : null, i < _slots.Count ? _slots[i].amount : 0);
+        }
+
+        for (int i = 0; i < _chestStorageSlotUIs.Count; i++)
+        {
+            if (_openedChest == null || i >= _openedChest.SlotCount)
+            {
+                UpdateTransferSlotVisual(_chestStorageSlotUIs[i], null, 0);
+                continue;
+            }
+
+            SceneChest.ChestSlotData chestSlot = _openedChest.GetSlot(i);
+            if (chestSlot == null || chestSlot.IsEmpty || !_itemCatalog.TryGetValue(chestSlot.itemId, out InventoryItemDefinition definition))
+            {
+                UpdateTransferSlotVisual(_chestStorageSlotUIs[i], null, 0);
+                continue;
+            }
+
+            UpdateTransferSlotVisual(_chestStorageSlotUIs[i], definition, chestSlot.amount);
+        }
+    }
+
+    private void UpdateTransferSlotVisual(TransferSlotUI slotUI, InventoryItemDefinition definition, int amount)
+    {
+        if (slotUI == null)
+        {
+            return;
+        }
+
+        bool hasItem = definition != null && amount > 0;
+        slotUI.Background.color = hasItem ? _selectedSlotColor : _slotColor;
+        slotUI.Icon.enabled = hasItem;
+        slotUI.AmountLabel.text = hasItem && amount > 1 ? amount.ToString() : string.Empty;
+
+        if (hasItem)
+        {
+            slotUI.Icon.color = definition.color;
+        }
+    }
+
+    public void BeginChestTransferDrag(bool fromChestStorage, int slotIndex)
+    {
+        if (!_chestOpen || _openedChest == null)
+        {
+            return;
+        }
+
+        InventoryItemDefinition definition = null;
+
+        if (fromChestStorage)
+        {
+            if (slotIndex < 0 || slotIndex >= _openedChest.SlotCount)
+            {
+                return;
+            }
+
+            SceneChest.ChestSlotData chestSlot = _openedChest.GetSlot(slotIndex);
+            if (chestSlot == null || chestSlot.IsEmpty || !_itemCatalog.TryGetValue(chestSlot.itemId, out definition))
+            {
+                return;
+            }
+
+            _draggedChestTransferContext = ChestTransferContext.Chest;
+        }
+        else
+        {
+            if (slotIndex < 0 || slotIndex >= _slots.Count)
+            {
+                return;
+            }
+
+            InventorySlot inventorySlot = _slots[slotIndex];
+            if (inventorySlot.IsEmpty)
+            {
+                return;
+            }
+
+            definition = inventorySlot.item;
+            _draggedChestTransferContext = ChestTransferContext.Inventory;
+        }
+
+        _draggedChestTransferSlotIndex = slotIndex;
+
+        if (_dragIcon != null && definition != null)
+        {
+            _dragIcon.enabled = true;
+            _dragIcon.color = definition.color;
+            _dragIcon.transform.SetAsLastSibling();
+        }
+    }
+
+    public void HandleChestTransferDrop(bool targetIsChestStorage, int targetSlotIndex)
+    {
+        if (!_chestOpen || _openedChest == null || _draggedChestTransferContext == ChestTransferContext.None)
+        {
+            EndChestTransferDrag();
+            return;
+        }
+
+        ChestTransferContext targetContext = targetIsChestStorage ? ChestTransferContext.Chest : ChestTransferContext.Inventory;
+
+        if (_draggedChestTransferContext == targetContext && _draggedChestTransferSlotIndex == targetSlotIndex)
+        {
+            EndChestTransferDrag();
+            return;
+        }
+
+        if (_draggedChestTransferContext == ChestTransferContext.Inventory && targetContext == ChestTransferContext.Inventory)
+        {
+            MergeStacks(_draggedChestTransferSlotIndex, targetSlotIndex);
+        }
+        else if (_draggedChestTransferContext == ChestTransferContext.Chest && targetContext == ChestTransferContext.Chest)
+        {
+            MergeChestStacks(_draggedChestTransferSlotIndex, targetSlotIndex);
+        }
+        else if (_draggedChestTransferContext == ChestTransferContext.Inventory && targetContext == ChestTransferContext.Chest)
+        {
+            MoveInventoryToChestTarget(_draggedChestTransferSlotIndex, targetSlotIndex);
+        }
+        else if (_draggedChestTransferContext == ChestTransferContext.Chest && targetContext == ChestTransferContext.Inventory)
+        {
+            MoveChestToInventoryTarget(_draggedChestTransferSlotIndex, targetSlotIndex);
+        }
+
+        EndChestTransferDrag();
+    }
+
+    public void EndChestTransferDrag()
+    {
+        _draggedChestTransferContext = ChestTransferContext.None;
+        _draggedChestTransferSlotIndex = -1;
+
+        if (_dragIcon != null)
+        {
+            _dragIcon.enabled = false;
+        }
+    }
+
+    private void MoveInventoryToChestTarget(int inventorySlotIndex, int chestSlotIndex)
+    {
+        if (_openedChest == null || inventorySlotIndex < 0 || inventorySlotIndex >= _slots.Count || chestSlotIndex < 0 || chestSlotIndex >= _openedChest.SlotCount)
+        {
+            return;
+        }
+
+        InventorySlot inventorySlot = _slots[inventorySlotIndex];
+        SceneChest.ChestSlotData chestSlot = _openedChest.GetSlot(chestSlotIndex);
+        if (inventorySlot.IsEmpty || chestSlot == null)
+        {
+            return;
+        }
+
+        InventoryItemDefinition sourceDefinition = inventorySlot.item;
+
+        if (chestSlot.IsEmpty)
+        {
+            SaveUndoState();
+            chestSlot.itemId = sourceDefinition.itemId;
+            chestSlot.amount = inventorySlot.amount;
+            inventorySlot.Clear();
+        }
+        else if (chestSlot.itemId == sourceDefinition.itemId)
+        {
+            int movableAmount = Mathf.Min(inventorySlot.amount, sourceDefinition.maxStack - chestSlot.amount);
+            if (movableAmount <= 0)
+            {
+                return;
+            }
+
+            SaveUndoState();
+            chestSlot.amount += movableAmount;
+            inventorySlot.amount -= movableAmount;
+            if (inventorySlot.amount <= 0)
+            {
+                inventorySlot.Clear();
+            }
+        }
+        else if (_itemCatalog.TryGetValue(chestSlot.itemId, out InventoryItemDefinition chestDefinition))
+        {
+            SaveUndoState();
+            string previousItemId = chestSlot.itemId;
+            int previousAmount = chestSlot.amount;
+
+            chestSlot.itemId = sourceDefinition.itemId;
+            chestSlot.amount = inventorySlot.amount;
+            inventorySlot.item = chestDefinition;
+            inventorySlot.amount = previousAmount;
+        }
+
+        ValidateHeldItem();
+        RefreshHeldItemFromHotbarSelection();
+        RefreshUI();
+    }
+
+    private void MoveChestToInventoryTarget(int chestSlotIndex, int inventorySlotIndex)
+    {
+        if (_openedChest == null || chestSlotIndex < 0 || chestSlotIndex >= _openedChest.SlotCount || inventorySlotIndex < 0 || inventorySlotIndex >= _slots.Count)
+        {
+            return;
+        }
+
+        SceneChest.ChestSlotData chestSlot = _openedChest.GetSlot(chestSlotIndex);
+        InventorySlot inventorySlot = _slots[inventorySlotIndex];
+        if (chestSlot == null || chestSlot.IsEmpty || !_itemCatalog.TryGetValue(chestSlot.itemId, out InventoryItemDefinition chestDefinition))
+        {
+            return;
+        }
+
+        if (inventorySlot.IsEmpty)
+        {
+            SaveUndoState();
+            inventorySlot.item = chestDefinition;
+            inventorySlot.amount = chestSlot.amount;
+            chestSlot.Clear();
+        }
+        else if (inventorySlot.item.itemId == chestDefinition.itemId)
+        {
+            int movableAmount = Mathf.Min(chestSlot.amount, inventorySlot.item.maxStack - inventorySlot.amount);
+            if (movableAmount <= 0)
+            {
+                return;
+            }
+
+            SaveUndoState();
+            inventorySlot.amount += movableAmount;
+            chestSlot.amount -= movableAmount;
+            if (chestSlot.amount <= 0)
+            {
+                chestSlot.Clear();
+            }
+        }
+        else
+        {
+            SaveUndoState();
+            string previousChestItemId = chestSlot.itemId;
+            int previousChestAmount = chestSlot.amount;
+
+            chestSlot.itemId = inventorySlot.item.itemId;
+            chestSlot.amount = inventorySlot.amount;
+            inventorySlot.item = chestDefinition;
+            inventorySlot.amount = previousChestAmount;
+        }
+
+        ValidateHeldItem();
+        RefreshHeldItemFromHotbarSelection();
+        RefreshUI();
+    }
+
+    private void MergeChestStacks(int sourceSlotIndex, int targetSlotIndex)
+    {
+        if (_openedChest == null || sourceSlotIndex < 0 || targetSlotIndex < 0 || sourceSlotIndex >= _openedChest.SlotCount || targetSlotIndex >= _openedChest.SlotCount)
+        {
+            return;
+        }
+
+        SceneChest.ChestSlotData sourceSlot = _openedChest.GetSlot(sourceSlotIndex);
+        SceneChest.ChestSlotData targetSlot = _openedChest.GetSlot(targetSlotIndex);
+
+        if (sourceSlot == null || targetSlot == null || sourceSlot.IsEmpty)
+        {
+            return;
+        }
+
+        if (targetSlot.IsEmpty)
+        {
+            SaveUndoState();
+            targetSlot.itemId = sourceSlot.itemId;
+            targetSlot.amount = sourceSlot.amount;
+            sourceSlot.Clear();
+            RefreshUI();
+            return;
+        }
+
+        if (!_itemCatalog.TryGetValue(sourceSlot.itemId, out InventoryItemDefinition sourceDefinition))
+        {
+            return;
+        }
+
+        if (sourceSlot.itemId != targetSlot.itemId)
+        {
+            SaveUndoState();
+            string previousItemId = targetSlot.itemId;
+            int previousAmount = targetSlot.amount;
+            targetSlot.itemId = sourceSlot.itemId;
+            targetSlot.amount = sourceSlot.amount;
+            sourceSlot.itemId = previousItemId;
+            sourceSlot.amount = previousAmount;
+            RefreshUI();
+            return;
+        }
+
+        int movableAmount = Mathf.Min(sourceSlot.amount, sourceDefinition.maxStack - targetSlot.amount);
+        if (movableAmount <= 0)
+        {
+            return;
+        }
+
+        SaveUndoState();
+        targetSlot.amount += movableAmount;
+        sourceSlot.amount -= movableAmount;
+        if (sourceSlot.amount <= 0)
+        {
+            sourceSlot.Clear();
+        }
+
+        RefreshUI();
+    }
+
+    private string BuildRecipeRequirementText(CraftingRecipe recipe)
+    {
+        List<string> parts = new List<string>();
+
+        for (int i = 0; i < recipe.requirements.Count; i++)
+        {
+            RecipeRequirement requirement = recipe.requirements[i];
+            int currentAmount = GetTotalItemAmount(requirement.itemId);
+            parts.Add(GetItemDisplayName(requirement.itemId) + ": " + currentAmount + "/" + requirement.amount);
+        }
+
+        return string.Join("  |  ", parts);
+    }
+
+    private bool CanCraftRecipe(CraftingRecipe recipe)
+    {
+        if (recipe == null || !_itemCatalog.TryGetValue(recipe.resultItemId, out InventoryItemDefinition resultDefinition))
+        {
+            return false;
+        }
+
+        List<InventorySlot> simulatedSlots = CloneSlots();
+
+        for (int i = 0; i < recipe.requirements.Count; i++)
+        {
+            RecipeRequirement requirement = recipe.requirements[i];
+            int remainingAmount = requirement.amount;
+
+            for (int slotIndex = 0; slotIndex < simulatedSlots.Count; slotIndex++)
+            {
+                InventorySlot slot = simulatedSlots[slotIndex];
+                if (slot.IsEmpty || slot.item.itemId != requirement.itemId)
+                {
+                    continue;
+                }
+
+                int amountToRemove = Mathf.Min(slot.amount, remainingAmount);
+                slot.amount -= amountToRemove;
+                remainingAmount -= amountToRemove;
+
+                if (slot.amount <= 0)
+                {
+                    slot.Clear();
+                }
+
+                if (remainingAmount <= 0)
+                {
+                    break;
+                }
+            }
+
+            if (remainingAmount > 0)
+            {
+                return false;
+            }
+        }
+
+        return CanStoreItemAmount(resultDefinition, recipe.resultAmount, simulatedSlots);
+    }
+
+    private void TryCraftRecipe(CraftingRecipe recipe)
+    {
+        if (!_craftingStationOpen || recipe == null || !CanCraftRecipe(recipe))
+        {
+            return;
+        }
+
+        SaveUndoState();
+
+        for (int i = 0; i < recipe.requirements.Count; i++)
+        {
+            RemoveItemAmount(recipe.requirements[i].itemId, recipe.requirements[i].amount);
+        }
+
+        ValidateHeldItem();
+        TryAddItem(recipe.resultItemId, recipe.resultAmount, false);
+        Debug.Log("Has creado " + GetItemDisplayName(recipe.resultItemId));
+        RefreshHeldItemFromHotbarSelection();
+        RefreshUI();
+    }
+
+    private bool RemoveItemAmount(string itemId, int amount)
+    {
+        int remainingAmount = amount;
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            InventorySlot slot = _slots[i];
+            if (slot.IsEmpty || slot.item.itemId != itemId)
+            {
+                continue;
+            }
+
+            int amountToRemove = Mathf.Min(slot.amount, remainingAmount);
+            slot.amount -= amountToRemove;
+            remainingAmount -= amountToRemove;
+
+            if (slot.amount <= 0)
+            {
+                slot.Clear();
+            }
+
+            if (remainingAmount <= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int GetTotalItemAmount(string itemId)
+    {
+        int totalAmount = 0;
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            InventorySlot slot = _slots[i];
+            if (!slot.IsEmpty && slot.item.itemId == itemId)
+            {
+                totalAmount += slot.amount;
+            }
+        }
+
+        return totalAmount;
+    }
+
+    private string GetItemDisplayName(string itemId)
+    {
+        return _itemCatalog.TryGetValue(itemId, out InventoryItemDefinition definition) ? definition.displayName : itemId;
+    }
+
+    public bool HasItem(string itemId, int amount)
+    {
+        return GetTotalItemAmount(itemId) >= amount;
+    }
+
+    public bool ConsumeItem(string itemId, int amount)
+    {
+        int totalAmount = GetTotalItemAmount(itemId);
+        if (totalAmount < amount)
+        {
+            return false;
+        }
+
+        RemoveItemAmount(itemId, amount);
+        return true;
+    }
+
+    private List<InventorySlot> CloneSlots()
+    {
+        List<InventorySlot> simulatedSlots = new List<InventorySlot>(_slots.Count);
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            InventorySlot slot = _slots[i];
+            simulatedSlots.Add(new InventorySlot
+            {
+                item = slot.item,
+                amount = slot.amount
+            });
+        }
+
+        return simulatedSlots;
+    }
+
     private static void StretchHorizontally(RectTransform rectTransform, float left, float right, float top, float height)
     {
         rectTransform.anchorMin = new Vector2(0f, 1f);
@@ -1462,5 +2437,39 @@ public class InventorySlotDragHandler : MonoBehaviour, IBeginDragHandler, IDragH
     public void OnDrop(PointerEventData eventData)
     {
         _inventoryController?.HandleSlotDrop(_slotIndex);
+    }
+}
+
+public class ChestTransferSlotDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
+{
+    private SceneInventoryController _inventoryController;
+    private int _slotIndex;
+    private bool _isChestStorage;
+
+    public void Initialize(SceneInventoryController inventoryController, int slotIndex, bool isChestStorage)
+    {
+        _inventoryController = inventoryController;
+        _slotIndex = slotIndex;
+        _isChestStorage = isChestStorage;
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        _inventoryController?.BeginChestTransferDrag(_isChestStorage, _slotIndex);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        _inventoryController?.UpdateSlotDrag(eventData.position);
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        _inventoryController?.EndChestTransferDrag();
+    }
+
+    public void OnDrop(PointerEventData eventData)
+    {
+        _inventoryController?.HandleChestTransferDrop(_isChestStorage, _slotIndex);
     }
 }

@@ -66,6 +66,13 @@ public class FirstPersonController : MonoBehaviour, IDamagable
                 if (pickupItem != null)
                 {
                     pickupItem.TryPickup(_inventoryController);
+                    return;
+                }
+
+                IWorldInteractable worldInteractable = hitInfo.collider.GetComponent<IWorldInteractable>();
+                if (worldInteractable != null)
+                {
+                    worldInteractable.TryInteract(_inventoryController);
                 }
             }
         }
@@ -120,6 +127,13 @@ public class FirstPersonController : MonoBehaviour, IDamagable
             if (pickupItem != null)
             {
                 _inventoryController.SetPickupPrompt(true, pickupItem.GetPickupPrompt());
+                return;
+            }
+
+            IWorldInteractable worldInteractable = pickupHitInfo.collider.GetComponent<IWorldInteractable>();
+            if (worldInteractable != null)
+            {
+                _inventoryController.SetPickupPrompt(true, worldInteractable.GetInteractionPrompt());
                 return;
             }
         }

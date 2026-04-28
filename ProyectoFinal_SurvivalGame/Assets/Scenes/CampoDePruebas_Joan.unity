@@ -1648,6 +1648,7 @@ GameObject:
   - component: {fileID: 1847783803}
   - component: {fileID: 1847783802}
   - component: {fileID: 1847783801}
+  - component: {fileID: 900000000000000000}
   m_Layer: 0
   m_Name: Piedra
   m_TagString: Untagged
@@ -1857,3 +1858,19 @@ SceneRoots:
   - {fileID: 449763254}
   - {fileID: 1057609917}
   - {fileID: 1416962597}
+--- !u!114 &900000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1847783800}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85a5e44b45a84dfca8685af6d4d6d63d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScenePickupItem
+  _autoConfigureFromObjectName: 1
+  _inventoryItemId: stone
+  _amount: 1
+  _pickupName: Piedra

@@ -111,6 +111,7 @@ public class SceneInventoryController : MonoBehaviour
     [SerializeField] private FirstPersonController _firstPersonController;
     [SerializeField] private FirstPersonBuilder _firstPersonBuilder;
     [SerializeField] private Camera _playerCamera;
+    [SerializeField] private GameObject _canvasPrefab;
 
     [Header("Inventory Settings")]
     [SerializeField] private int _inventorySize = 20;
@@ -225,7 +226,20 @@ public class SceneInventoryController : MonoBehaviour
         BuildCraftingRecipes();
         InitializeSlots();
         SeedInventory();
-        BuildInventoryUI();
+
+        // Usar prefab del Canvas si está asignado
+        if (_canvasPrefab != null)
+        {
+            GameObject canvasInstance = Instantiate(_canvasPrefab);
+            canvasInstance.name = "Canvas";
+            _generatedUiRoot = canvasInstance.transform;
+            canvasInstance.SetActive(false);
+        }
+        else
+        {
+            BuildInventoryUI();
+        }
+
         SelectSlot(0);
         _activeHotbarSlotIndex = 0;
         SetInventoryOpen(false, true);
@@ -652,7 +666,14 @@ public class SceneInventoryController : MonoBehaviour
             return;
         }
 
-        SetInventoryOpen(!_inventoryOpen);
+        bool newState = !_inventoryOpen;
+        SetInventoryOpen(newState);
+        
+        // Si estamos usando prefab de Canvas, activar/desactivar directamente
+        if (_canvasPrefab != null && _generatedUiRoot != null)
+        {
+            _generatedUiRoot.gameObject.SetActive(newState);
+        }
     }
 
     private void HandleHotbarShortcuts()

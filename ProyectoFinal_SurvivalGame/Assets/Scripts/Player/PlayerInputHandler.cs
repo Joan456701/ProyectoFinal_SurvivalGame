@@ -11,9 +11,24 @@ public class PlayerInputHandler : MonoBehaviour
     public bool jumpTriggered { get; private set; }
     public bool sprintTriggered { get; private set; }
     public bool interactTriggered { get; private set; }
-    public bool attackTiggered;
+    public bool attackTiggered { get; private set; }
     public bool isBuildMode {  get; private set; } = false;
     public bool destroyTriggered { get; private set; }
+    public bool slot1Triggered { get; private set; }
+    public bool slot2Triggered { get; private set; }
+    public bool slot3Triggered { get; private set; }
+    public bool slot4Triggered { get; private set; }
+    public bool slot5Triggered { get; private set; }
+    public bool subdivideTriggered;
+    public bool dropTriggered;
+    public bool dropAllTriggered { get; private set; }
+    public bool dropOneTriggered;
+    public bool dropHalfTriggered;
+    public bool eatTriggered { get; private set; }
+    public bool equipTriggered;
+    public bool inventoryTriggered;
+    public bool undoTriggered;
+
     public bool rotateTriggered;
     public bool buildingMenu;
 
@@ -83,9 +98,65 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.Player.Rotate.performed += inputInfo => rotateTriggered = true;
         _playerControls.Player.Rotate.canceled += inputInfo => rotateTriggered = false;
 
+        // --- Slot1 Objects ---
+        _playerControls.Player.Slot1.performed += inputInfo => slot1Triggered = true;
+        _playerControls.Player.Slot1.canceled += inputInfo => slot1Triggered = false;
+
+        // --- Slot2 Objects ---
+        _playerControls.Player.Slot2.performed += inputInfo => slot2Triggered = true;
+        _playerControls.Player.Slot2.canceled += inputInfo => slot2Triggered = false;
+
+        // --- slot3 Objects ---
+        _playerControls.Player.Slot3.performed += inputInfo => slot3Triggered = true;
+        _playerControls.Player.Slot3.canceled += inputInfo => slot3Triggered = false;
+
+        // --- Slot4 Objects ---
+        _playerControls.Player.Slot4.performed += inputInfo => slot4Triggered = true;
+        _playerControls.Player.Slot4.canceled += inputInfo => slot4Triggered = false;
+
+        // --- Slot5 Objects ---
+        _playerControls.Player.Slot5.performed += inputInfo => slot5Triggered = true;
+        _playerControls.Player.Slot5.canceled += inputInfo => slot5Triggered = false;
+
+        // --- Subdivide Objects ---
+        _playerControls.Player.Subdivide.performed += inputInfo => subdivideTriggered = true;
+        _playerControls.Player.Subdivide.canceled += inputInfo => subdivideTriggered = false;
+
+        // --- Drop Objects ---
+        _playerControls.Player.Drop.performed += inputInfo => dropTriggered = true;
+        _playerControls.Player.Drop.canceled += inputInfo => dropTriggered = false;
+
+        // --- DropAll Objects ---
+        _playerControls.Player.DropAll.performed += inputInfo => dropAllTriggered = true;
+        _playerControls.Player.DropAll.canceled += inputInfo => dropAllTriggered = false;
+
+        // --- DropOne Objects ---
+        _playerControls.Player.DropOne.performed += inputInfo => dropOneTriggered = true;
+        _playerControls.Player.DropOne.canceled += inputInfo => dropOneTriggered = false;
+
+        // --- DropHalf Objects ---
+        _playerControls.Player.DropHalf.performed += inputInfo => dropHalfTriggered = true;
+        _playerControls.Player.DropHalf.canceled += inputInfo => dropHalfTriggered = false;
+
+        // --- Eat Objects ---
+        _playerControls.Player.Eat.performed += inputInfo => eatTriggered = true;
+        _playerControls.Player.Eat.canceled += inputInfo => eatTriggered = false;
+
         // --- Open Building Menu ---
         _playerControls.Player.BuildingMenu.performed += inputInfo => buildingMenu = true;
         _playerControls.Player.BuildingMenu.canceled += inputInfo => buildingMenu = false;
+
+        // --- Open Inventory ---
+        _playerControls.Player.OpenInventory.performed += inputInfo => inventoryTriggered = true;
+        _playerControls.Player.OpenInventory.canceled += inputInfo => inventoryTriggered = false;
+
+        // --- Undo ---
+        _playerControls.Player.Undo.performed += inputInfo => undoTriggered = true;
+        _playerControls.Player.Undo.canceled += inputInfo => undoTriggered = false;
+
+        // --- Equip ---
+        _playerControls.Player.Equip.performed += inputInfo => equipTriggered = true;
+        _playerControls.Player.Equip.canceled += inputInfo => equipTriggered = false;
 
         // --- UI MAP ---
         // --- Player interact UI ---

@@ -59,7 +59,7 @@ public class FirstPersonController : MonoBehaviour, IDamagable
 
         UpdatePickupPrompt();
 
-        if (_pInputHandler.interactTriggered)
+        if (_pInputHandler.ConsumeInteractTrigger())
         {
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;

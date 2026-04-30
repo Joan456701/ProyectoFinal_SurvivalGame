@@ -5,11 +5,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
-[ExecuteAlways]
 public class SceneInventoryController : MonoBehaviour
 {
     private const string GeneratedUiRootName = "GeneratedInventoryUI";
@@ -166,8 +162,8 @@ public class SceneInventoryController : MonoBehaviour
     private int _draggedSlotIndex = -1;
     private ChestTransferContext _draggedChestTransferContext = ChestTransferContext.None;
     private int _draggedChestTransferSlotIndex = -1;
-    private bool _editorPreviewRefreshQueued;
     private SceneChest _openedChest;
+    private bool _isDuplicateController;
 
     private bool IsAnyMenuOpen()
     {
@@ -179,6 +175,12 @@ public class SceneInventoryController : MonoBehaviour
         if (_instance == null)
         {
             _instance = this;
+        }
+        else if (_instance != this)
+        {
+            _isDuplicateController = true;
+            enabled = false;
+            return;
         }
 
         if (_playerInputHandler == null)
@@ -202,24 +204,13 @@ public class SceneInventoryController : MonoBehaviour
         }
     }
 
-    private void OnEnable()
-    {
-        if (!Application.isPlaying)
-        {
-            QueueEditorPreviewRefresh();
-        }
-    }
-
-    private void OnValidate()
-    {
-        if (!Application.isPlaying)
-        {
-            QueueEditorPreviewRefresh();
-        }
-    }
-
     private void Start()
     {
+        if (_isDuplicateController)
+        {
+            return;
+        }
+
         _defaultFont = _uiFont != null ? _uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         BuildCatalog();
@@ -227,22 +218,37 @@ public class SceneInventoryController : MonoBehaviour
         InitializeSlots();
         SeedInventory();
 
-        // Usar prefab del Canvas si está asignado
-        if (_canvasPrefab != null)
+        bool controllerIsOnCanvas = GetComponent<Canvas>() != null && (transform as RectTransform) != null;
+
+        if (controllerIsOnCanvas || _canvasPrefab == null)
         {
-            GameObject canvasInstance = Instantiate(_canvasPrefab);
-            canvasInstance.name = "Canvas";
-            _generatedUiRoot = canvasInstance.transform;
-            canvasInstance.SetActive(false);
+            InitializeInventoryUI();
         }
         else
         {
-            BuildInventoryUI();
+            // Usar prefab del Canvas solo cuando el controlador no vive ya dentro de un Canvas.
+            GameObject canvasInstance = Instantiate(_canvasPrefab);
+            canvasInstance.name = "Canvas";
+            _generatedUiRoot = canvasInstance.transform.gameObject;
+
+            SceneInventoryController clonedController = canvasInstance.GetComponent<SceneInventoryController>();
+            if (clonedController != null && clonedController != this)
+            {
+                clonedController.enabled = false;
+            }
         }
 
         SelectSlot(0);
         _activeHotbarSlotIndex = 0;
         SetInventoryOpen(false, true);
+    }
+
+    private void OnDestroy()
+    {
+        if (_instance == this)
+        {
+            _instance = null;
+        }
     }
 
     private void Update()
@@ -649,7 +655,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleInventoryToggle()
     {
-        if (_playerInputHandler == null || !_playerInputHandler.inventoryTriggered)
+        if (_playerInputHandler == null || !_playerInputHandler.ConsumeInventoryToggle())
         {
             return;
         }
@@ -668,12 +674,6 @@ public class SceneInventoryController : MonoBehaviour
 
         bool newState = !_inventoryOpen;
         SetInventoryOpen(newState);
-        
-        // Si estamos usando prefab de Canvas, activar/desactivar directamente
-        if (_canvasPrefab != null && _generatedUiRoot != null)
-        {
-            _generatedUiRoot.gameObject.SetActive(newState);
-        }
     }
 
     private void HandleHotbarShortcuts()
@@ -697,7 +697,7 @@ public class SceneInventoryController : MonoBehaviour
 
     private void HandleDropShortcut()
     {
-        if (!_inventoryOpen || _craftingStationOpen || _chestOpen || _playerInputHandler == null || !_playerInputHandler.dropTriggered)
+        if (!_inventoryOpen || _craftingStationOpen || _chestOpen || _playerInputHandler == null || !_playerInputHandler.ConsumeDropTrigger())
         {
             return;
         }
@@ -732,17 +732,17 @@ public class SceneInventoryController : MonoBehaviour
             return;
         }
 
-        if (_playerInputHandler.dropAllTriggered)
+        if (_playerInputHandler.ConsumeDropAllTrigger())
         {
             DropFromActiveHotbarStack(DropMode.FullStack);
         }
 
-        if (_playerInputHandler.dropHalfTriggered)
+        if (_playerInputHandler.ConsumeDropHalfTrigger())
         {
             DropFromActiveHotbarStack(DropMode.HalfStack);
         }
 
-        if (_playerInputHandler.dropOneTriggered)
+        if (_playerInputHandler.ConsumeDropOneTrigger())
         {
             DropFromActiveHotbarStack(DropMode.SingleUnit);
         }
@@ -882,6 +882,259 @@ public class SceneInventoryController : MonoBehaviour
         _activeHotbarSlotIndex = hotbarSlotIndex;
         SelectSlot(hotbarSlotIndex);
         RefreshHeldItemFromHotbarSelection();
+    }
+
+    private void InitializeInventoryUI()
+    {
+        RectTransform canvasRect = transform as RectTransform;
+        if (canvasRect == null)
+        {
+            return;
+        }
+
+        _crosshair = transform.Find("Image") != null ? transform.Find("Image").gameObject : null;
+
+        if (!TryBindExistingInventoryUI(canvasRect))
+        {
+            BuildInventoryUI();
+        }
+    }
+
+    private bool TryBindExistingInventoryUI(RectTransform canvasRect)
+    {
+        Transform existingRoot = canvasRect.Find(GeneratedUiRootName);
+        if (existingRoot == null || existingRoot.childCount == 0)
+        {
+            return false;
+        }
+
+        _generatedUiRoot = existingRoot.gameObject;
+        _inventoryPanel = FindChildRecursive(existingRoot, "InventoryPanel")?.gameObject;
+        _hotbarPanel = FindChildRecursive(existingRoot, "HotbarPanel")?.gameObject;
+        _craftingWindow = FindChildRecursive(existingRoot, "CraftingWindow")?.gameObject;
+        _chestWindow = FindChildRecursive(existingRoot, "ChestWindow")?.gameObject;
+
+        if (_inventoryPanel == null || _hotbarPanel == null)
+        {
+            return false;
+        }
+
+        _pickupPromptText = FindChildRecursive(existingRoot, "PickupPrompt")?.GetComponent<Text>();
+        _dragIcon = FindChildRecursive(existingRoot, "DragIcon")?.GetComponent<Image>();
+        if (_dragIcon != null)
+        {
+            _dragIcon.raycastTarget = false;
+            _dragIcon.enabled = false;
+        }
+
+        _detailTitle = FindChildRecursive(_inventoryPanel.transform, "SelectedItemTitle")?.GetComponent<Text>();
+        _detailAmount = FindChildRecursive(_inventoryPanel.transform, "SelectedItemAmount")?.GetComponent<Text>();
+        _detailDescription = FindChildRecursive(_inventoryPanel.transform, "SelectedItemDescription")?.GetComponent<Text>();
+        _craftingHintText = FindChildRecursive(_craftingWindow != null ? _craftingWindow.transform : existingRoot, "Hint")?.GetComponent<Text>();
+        _chestHintText = _chestWindow != null ? FindChildRecursive(_chestWindow.transform, "Hint")?.GetComponent<Text>() : null;
+
+        BindExistingInventorySlots();
+        BindExistingCraftingRecipes();
+        BindExistingChestSlots();
+        BindExistingHotbarSlots();
+
+        return _inventorySlotUIs.Count == _slots.Count && _hotbarSlotUIs.Count == _hotbarSize;
+    }
+
+    private void BindExistingInventorySlots()
+    {
+        _inventorySlotUIs.Clear();
+
+        Transform gridContainer = FindChildRecursive(_inventoryPanel.transform, "GridContainer");
+        if (gridContainer == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            Transform slotTransform = FindDirectChild(gridContainer, "Slot_" + i);
+            if (slotTransform != null && TryBindSlotUI(slotTransform, i, i < _hotbarSize ? (i + 1).ToString() : string.Empty, out SlotUI slotUI))
+            {
+                _inventorySlotUIs.Add(slotUI);
+            }
+        }
+    }
+
+    private void BindExistingHotbarSlots()
+    {
+        _hotbarSlotUIs.Clear();
+
+        if (_hotbarPanel == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < _hotbarSize; i++)
+        {
+            Transform slotTransform = FindDirectChild(_hotbarPanel.transform, "Slot_" + i);
+            if (slotTransform != null && TryBindSlotUI(slotTransform, i, (i + 1).ToString(), out SlotUI slotUI))
+            {
+                _hotbarSlotUIs.Add(slotUI);
+            }
+        }
+    }
+
+    private bool TryBindSlotUI(Transform slotTransform, int slotIndex, string shortcut, out SlotUI slotUI)
+    {
+        slotUI = null;
+
+        Image background = slotTransform.GetComponent<Image>();
+        Image icon = FindDirectChild(slotTransform, "Icon")?.GetComponent<Image>();
+        Text amountLabel = FindDirectChild(slotTransform, "Amount")?.GetComponent<Text>();
+        Text shortcutLabel = FindDirectChild(slotTransform, "Shortcut")?.GetComponent<Text>();
+
+        if (background == null || icon == null || amountLabel == null || shortcutLabel == null)
+        {
+            return false;
+        }
+
+        Button button = slotTransform.GetComponent<Button>();
+        if (button == null)
+        {
+            button = slotTransform.gameObject.AddComponent<Button>();
+        }
+
+        button.onClick.RemoveAllListeners();
+        int capturedIndex = slotIndex;
+        button.onClick.AddListener(delegate { SelectSlot(capturedIndex); });
+
+        InventorySlotDragHandler dragHandler = slotTransform.GetComponent<InventorySlotDragHandler>();
+        if (dragHandler == null)
+        {
+            dragHandler = slotTransform.gameObject.AddComponent<InventorySlotDragHandler>();
+        }
+
+        dragHandler.Initialize(this, slotIndex);
+        shortcutLabel.text = shortcut;
+
+        slotUI = new SlotUI
+        {
+            Index = slotIndex,
+            Background = background,
+            Icon = icon,
+            AmountLabel = amountLabel,
+            ShortcutLabel = shortcutLabel
+        };
+
+        return true;
+    }
+
+    private void BindExistingCraftingRecipes()
+    {
+        _craftingRecipeUIs.Clear();
+
+        if (_craftingWindow == null)
+        {
+            return;
+        }
+
+        Transform recipeContent = FindChildRecursive(_craftingWindow.transform, "RecipeContent");
+        if (recipeContent == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < _craftingRecipes.Count; i++)
+        {
+            CraftingRecipe recipe = _craftingRecipes[i];
+            Transform rowTransform = FindDirectChild(recipeContent, "Recipe_" + recipe.resultItemId);
+            if (rowTransform == null)
+            {
+                continue;
+            }
+
+            Button createButton = FindChildRecursive(rowTransform, "CreateButton")?.GetComponent<Button>();
+            if (createButton != null)
+            {
+                createButton.onClick.RemoveAllListeners();
+                CraftingRecipe capturedRecipe = recipe;
+                createButton.onClick.AddListener(delegate { TryCraftRecipe(capturedRecipe); });
+            }
+
+            _craftingRecipeUIs.Add(new CraftingRecipeUI
+            {
+                Recipe = recipe,
+                NameLabel = FindDirectChild(rowTransform, "Name")?.GetComponent<Text>(),
+                RequirementsLabel = FindDirectChild(rowTransform, "Requirements")?.GetComponent<Text>(),
+                StatusLabel = FindDirectChild(rowTransform, "Status")?.GetComponent<Text>(),
+                CreateButton = createButton,
+                ButtonImage = createButton != null ? createButton.GetComponent<Image>() : null
+            });
+        }
+    }
+
+    private void BindExistingChestSlots()
+    {
+        _chestStorageSlotUIs.Clear();
+        _chestInventorySlotUIs.Clear();
+
+        if (_chestWindow == null)
+        {
+            return;
+        }
+
+        Transform storageGrid = FindChildRecursive(_chestWindow.transform, "ChestStorageGrid");
+        Transform inventoryGrid = FindChildRecursive(_chestWindow.transform, "ChestInventoryGrid");
+
+        for (int i = 0; i < 12; i++)
+        {
+            Transform slotTransform = storageGrid != null ? FindDirectChild(storageGrid, "TransferSlot_" + i) : null;
+            if (slotTransform != null && TryBindTransferSlotUI(slotTransform, i, true, out TransferSlotUI slotUI))
+            {
+                _chestStorageSlotUIs.Add(slotUI);
+            }
+        }
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            Transform slotTransform = inventoryGrid != null ? FindDirectChild(inventoryGrid, "TransferSlot_" + i) : null;
+            if (slotTransform != null && TryBindTransferSlotUI(slotTransform, i, false, out TransferSlotUI slotUI))
+            {
+                _chestInventorySlotUIs.Add(slotUI);
+            }
+        }
+    }
+
+    private bool TryBindTransferSlotUI(Transform slotTransform, int slotIndex, bool isChestStorage, out TransferSlotUI slotUI)
+    {
+        slotUI = null;
+
+        Image background = slotTransform.GetComponent<Image>();
+        Image icon = FindDirectChild(slotTransform, "Icon")?.GetComponent<Image>();
+        Text amountLabel = FindDirectChild(slotTransform, "Amount")?.GetComponent<Text>();
+        Text label = FindDirectChild(slotTransform, "Label")?.GetComponent<Text>();
+        Button button = slotTransform.GetComponent<Button>();
+
+        if (background == null || icon == null || amountLabel == null || label == null || button == null)
+        {
+            return false;
+        }
+
+        ChestTransferSlotDragHandler dragHandler = slotTransform.GetComponent<ChestTransferSlotDragHandler>();
+        if (dragHandler == null)
+        {
+            dragHandler = slotTransform.gameObject.AddComponent<ChestTransferSlotDragHandler>();
+        }
+
+        dragHandler.Initialize(this, slotIndex, isChestStorage);
+
+        slotUI = new TransferSlotUI
+        {
+            Index = slotIndex,
+            Background = background,
+            Icon = icon,
+            AmountLabel = amountLabel,
+            Label = label,
+            Button = button
+        };
+
+        return true;
     }
 
     private void BuildInventoryUI()
@@ -1244,18 +1497,36 @@ public class SceneInventoryController : MonoBehaviour
         bool isSelected = slotUI.Index == _selectedSlotIndex;
         bool isActiveHotbarSlot = slotUI.Index == _activeHotbarSlotIndex && slotUI.Index < _hotbarSize;
 
-        slotUI.Background.color = isSelected || isActiveHotbarSlot ? _selectedSlotColor : _slotColor;
+        if (slotUI.Background != null)
+        {
+            slotUI.Background.color = isSelected || isActiveHotbarSlot ? _selectedSlotColor : _slotColor;
+        }
 
         if (slot.IsEmpty)
         {
-            slotUI.Icon.enabled = false;
-            slotUI.AmountLabel.text = string.Empty;
+            if (slotUI.Icon != null)
+            {
+                slotUI.Icon.enabled = false;
+            }
+
+            if (slotUI.AmountLabel != null)
+            {
+                slotUI.AmountLabel.text = string.Empty;
+            }
+
             return;
         }
 
-        slotUI.Icon.enabled = true;
-        slotUI.Icon.color = slot.item.color;
-        slotUI.AmountLabel.text = slot.amount > 1 ? slot.amount.ToString() : string.Empty;
+        if (slotUI.Icon != null)
+        {
+            slotUI.Icon.enabled = true;
+            slotUI.Icon.color = slot.item.color;
+        }
+
+        if (slotUI.AmountLabel != null)
+        {
+            slotUI.AmountLabel.text = slot.amount > 1 ? slot.amount.ToString() : string.Empty;
+        }
     }
 
     private void RefreshDetailsPanel()
@@ -1708,45 +1979,6 @@ public class SceneInventoryController : MonoBehaviour
         return panel;
     }
 
-    private void EnsureEditorPreviewUI()
-    {
-        _defaultFont = _uiFont != null ? _uiFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        BuildCatalog();
-        BuildCraftingRecipes();
-        InitializeSlots();
-        BuildInventoryUI();
-        _selectedSlotIndex = Mathf.Clamp(_selectedSlotIndex, 0, Mathf.Max(0, _inventorySize - 1));
-        _activeHotbarSlotIndex = Mathf.Clamp(_activeHotbarSlotIndex, 0, Mathf.Max(0, _hotbarSize - 1));
-        SetInventoryOpen(false, true);
-    }
-
-    private void QueueEditorPreviewRefresh()
-    {
-#if UNITY_EDITOR
-        if (_editorPreviewRefreshQueued)
-        {
-            return;
-        }
-
-        _editorPreviewRefreshQueued = true;
-        EditorApplication.delayCall += RefreshEditorPreviewIfAlive;
-#endif
-    }
-
-#if UNITY_EDITOR
-    private void RefreshEditorPreviewIfAlive()
-    {
-        _editorPreviewRefreshQueued = false;
-
-        if (this == null || gameObject == null || Application.isPlaying)
-        {
-            return;
-        }
-
-        EnsureEditorPreviewUI();
-    }
-#endif
-
     private void EnsureGeneratedUiRoot(RectTransform canvasRect)
     {
         if (_generatedUiRoot == null)
@@ -1784,15 +2016,61 @@ public class SceneInventoryController : MonoBehaviour
 
         for (int i = 0; i < childrenToDelete.Count; i++)
         {
+            GameObject go = childrenToDelete[i];
+
             if (Application.isPlaying)
             {
-                Destroy(childrenToDelete[i]);
+                Destroy(go);
             }
             else
             {
-                DestroyImmediate(childrenToDelete[i]);
+                DestroyImmediate(go);
             }
         }
+    }
+
+    private static Transform FindDirectChild(Transform parent, string childName)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child.name == childName)
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private static Transform FindChildRecursive(Transform parent, string childName)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        Transform directChild = FindDirectChild(parent, childName);
+        if (directChild != null)
+        {
+            return directChild;
+        }
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform match = FindChildRecursive(parent.GetChild(i), childName);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private GameObject CreateUIObject(string name, Transform parent)
@@ -1909,10 +2187,23 @@ public class SceneInventoryController : MonoBehaviour
         {
             CraftingRecipeUI recipeUI = _craftingRecipeUIs[i];
             bool canCraft = _craftingStationOpen && CanCraftRecipe(recipeUI.Recipe);
-            recipeUI.RequirementsLabel.text = BuildRecipeRequirementText(recipeUI.Recipe);
-            recipeUI.StatusLabel.text = canCraft ? "Materiales completos" : "Te faltan materiales";
-            recipeUI.StatusLabel.color = canCraft ? _craftReadyButtonColor : _hintTextColor;
-            recipeUI.CreateButton.interactable = canCraft;
+
+            if (recipeUI.RequirementsLabel != null)
+            {
+                recipeUI.RequirementsLabel.text = BuildRecipeRequirementText(recipeUI.Recipe);
+            }
+
+            if (recipeUI.StatusLabel != null)
+            {
+                recipeUI.StatusLabel.text = canCraft ? "Materiales completos" : "Te faltan materiales";
+                recipeUI.StatusLabel.color = canCraft ? _craftReadyButtonColor : _hintTextColor;
+            }
+
+            if (recipeUI.CreateButton != null)
+            {
+                recipeUI.CreateButton.interactable = canCraft;
+            }
+
             if (recipeUI.ButtonImage != null)
             {
                 recipeUI.ButtonImage.color = canCraft ? _craftReadyButtonColor : _craftDisabledButtonColor;
@@ -1968,11 +2259,22 @@ public class SceneInventoryController : MonoBehaviour
         }
 
         bool hasItem = definition != null && amount > 0;
-        slotUI.Background.color = hasItem ? _selectedSlotColor : _slotColor;
-        slotUI.Icon.enabled = hasItem;
-        slotUI.AmountLabel.text = hasItem && amount > 1 ? amount.ToString() : string.Empty;
+        if (slotUI.Background != null)
+        {
+            slotUI.Background.color = hasItem ? _selectedSlotColor : _slotColor;
+        }
 
-        if (hasItem)
+        if (slotUI.Icon != null)
+        {
+            slotUI.Icon.enabled = hasItem;
+        }
+
+        if (slotUI.AmountLabel != null)
+        {
+            slotUI.AmountLabel.text = hasItem && amount > 1 ? amount.ToString() : string.Empty;
+        }
+
+        if (hasItem && slotUI.Icon != null)
         {
             slotUI.Icon.color = definition.color;
         }
@@ -2385,13 +2687,34 @@ public class SceneInventoryController : MonoBehaviour
 
     public bool ConsumeItem(string itemId, int amount)
     {
-        int totalAmount = GetTotalItemAmount(itemId);
-        if (totalAmount < amount)
+        return ConsumeItems((itemId, amount));
+    }
+
+    public bool ConsumeItems(params (string itemId, int amount)[] items)
+    {
+        if (items == null || items.Length == 0)
         {
             return false;
         }
 
-        RemoveItemAmount(itemId, amount);
+        for (int i = 0; i < items.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(items[i].itemId) || items[i].amount <= 0 || GetTotalItemAmount(items[i].itemId) < items[i].amount)
+            {
+                return false;
+            }
+        }
+
+        SaveUndoState();
+
+        for (int i = 0; i < items.Length; i++)
+        {
+            RemoveItemAmount(items[i].itemId, items[i].amount);
+        }
+
+        ValidateHeldItem();
+        RefreshHeldItemFromHotbarSelection();
+        RefreshUI();
         return true;
     }
 

@@ -1,9 +1,12 @@
 using System.Diagnostics.Tracing;
-using UnityEngine;
 using static UnityEngine.UI.Image;
+using UnityEngine;
+using System;
 
 public class FirstPersonController : MonoBehaviour, IDamagable
 {
+    public static event Action<Transform> OnPlayerAttackEvent;
+
     [Header("Movment Speeds")]
     [SerializeField] private float _walkSpeed = 5f;
     [SerializeField] private float _sprintMultiplier = 2f;
@@ -93,6 +96,7 @@ public class FirstPersonController : MonoBehaviour, IDamagable
         if (!_pInputHandler.isBuildMode)
         {
             Debug.Log("El jugador ha atacado");
+            OnPlayerAttackEvent?.Invoke(this.transform);
 
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;

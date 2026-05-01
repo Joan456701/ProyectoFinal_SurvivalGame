@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using Unity.AI.Navigation;
 using UnityEngine;
 
 public class FloorPlacedObject : MonoBehaviour, IDamagable
@@ -29,6 +30,8 @@ public class FloorPlacedObject : MonoBehaviour, IDamagable
     private FloorEdgePlacedObject _leftEdgeObject;
     private FloorEdgePlacedObject _rightEdgeObject;
 
+    private NavMeshSurface _navMeshSurface;
+
     private void Start()
     {
         // Al nacer, el Suelo comprueba sus 4 lados automáticamente
@@ -38,6 +41,27 @@ public class FloorPlacedObject : MonoBehaviour, IDamagable
         CheckNeighborForWall(Edge.Right);
 
         _health = _maxHealth;
+
+        _navMeshSurface = FindFirstObjectByType<NavMeshSurface>();
+        if (_navMeshSurface != null)
+        {
+            RebuildNavMesh();
+        }
+    }
+    private void RebuildNavMesh()
+    {
+        if (_navMeshSurface == null) return;
+
+        // Guarda la configuracion original
+        LayerMask originalMask = _navMeshSurface.layerMask;
+
+        // Excluye el layer de los pivotes (cambia "NavMeshIgnore" por el nombre de tu layer)
+        _navMeshSurface.layerMask = originalMask & ~LayerMask.GetMask("NavMeshIgnore");
+
+        _navMeshSurface.BuildNavMesh();
+
+        // Restaura
+        _navMeshSurface.layerMask = originalMask;
     }
 
     // Función para mirar si el vecin ya ha colocado el muro
@@ -66,9 +90,13 @@ public class FloorPlacedObject : MonoBehaviour, IDamagable
 
         if (_health <= 0)
         {
+            gameObject.SetActive(false);
+
             Grid<GridObject> grid = GridManager.Instance.GetGrid(transform.position);
             grid.GetXZ(transform.position, out int x, out int z);
             grid.GetGridObject(x, z)?.SetPlacedObject(null);
+
+            RebuildNavMesh();
 
             Destroy(gameObject);
         }
@@ -95,6 +123,11 @@ public class FloorPlacedObject : MonoBehaviour, IDamagable
         {
             Edge opositeEdge = GetOppositeEdge(edge);
             neighbor.SetFloorPlacedObjects(opositeEdge, floorEdgePlacedObject);
+        }
+
+        if (floorEdgeObjectTypeSO.isStairs && _navMeshSurface != null)
+        {
+            _navMeshSurface.BuildNavMesh();
         }
     }
 

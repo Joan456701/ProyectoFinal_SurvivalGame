@@ -95,7 +95,7 @@ public class FirstPersonBuilder : MonoBehaviour
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
 
-            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
+            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 Vector3 checkCenter = hitInfo.point + new Vector3(0, _currentLooseBuilding.clearanceSize.y / 2f, 0);
                 
@@ -111,7 +111,7 @@ public class FirstPersonBuilder : MonoBehaviour
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
 
-            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
+            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 //Pide al gridManger que le diga que piso es
                 Grid<GridObject> currentGrid = GridManager.Instance.GetGrid(hitInfo.point);
@@ -173,7 +173,7 @@ public class FirstPersonBuilder : MonoBehaviour
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
 
-            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance))
+            if (Physics.Raycast(origin, direction, out RaycastHit hitInfo, _raycastDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 Vector3 checkCenter = hitInfo.point + new Vector3(0, _currentLooseBuilding.clearanceSize.y / 2f, 0);
 

@@ -6,4 +6,7 @@ public class FloorEdgeObjectTypeSO : ScriptableObject
     public Transform prefab;
     public Transform ghostPrefab;
     public bool isStairs;
+
+    [Header("Costes de Construcción")]
+    public BuildRequirement[] requirements;
 }

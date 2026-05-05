@@ -8,9 +8,9 @@ public class EnemyController : MonoBehaviour, IDamagable
     [SerializeField] private float _vanishDistance;
 
     [Header("Variables de ataque")]
-    [SerializeField] private float _attackDistance = 4f;
-    [SerializeField] private float _cooldown = 2;
-    [SerializeField] private int _attackDamage = 1;
+    [SerializeField] protected float _attackDistance = 4f;
+    [SerializeField] protected float _cooldown = 2;
+    [SerializeField] protected int _attackDamage = 1;
 
     private float _timeSinceLastAttack = 0;
 
@@ -18,16 +18,17 @@ public class EnemyController : MonoBehaviour, IDamagable
     [SerializeField] private float _maxTime = 5f;
 
     [Header("Vida")]
-    [SerializeField] private int _maxHealth;
+    [SerializeField] protected int _maxHealth;
     private int _health;
 
     [Header("Inteligencia de Destrucción")]
     [SerializeField] private float _maxDetourMultiplier = 1.5f;
 
-    private Collider _spaceshipCollider;
-    private Transform _spaceshipTarget;
-    private Transform _currentTarget;
-    private NavMeshAgent _navAgent;
+    protected BoxCollider _spaceshipCollider;
+    protected Transform _spaceshipTarget;
+    protected Transform _playerTarget;
+    protected Transform _currentTarget;
+    protected NavMeshAgent _navAgent;
 
     private float _timeWithoutSeeingPlayer = 0f;
     private bool isJumping = false;
@@ -45,7 +46,7 @@ public class EnemyController : MonoBehaviour, IDamagable
         if (_spaceship != null)
         { 
             _spaceshipTarget = _spaceship.transform; 
-            _spaceshipCollider = _spaceship.GetComponent<Collider>();
+            _spaceshipCollider = _spaceship.GetComponent<BoxCollider>();
         }
             
         _currentTarget = _spaceshipTarget.transform;
@@ -57,8 +58,44 @@ public class EnemyController : MonoBehaviour, IDamagable
 
     private void OnDisable(){FirstPersonController.OnPlayerAttackEvent -= ListenThePlayer;}
 
+    protected virtual void Update()
+    {
+        if (_currentTarget == null || _spaceshipTarget == null)
+            return;
+
+        if (_currentTarget == _playerTarget)
+        {
+            HandlePlayerTarget();
+        }
+        else if (_currentTarget == _spaceshipTarget)
+        {
+            HandleSpaceshipTarget(); 
+        }
+
+        if (_navAgent.isOnOffMeshLink && !isJumping)
+        {
+            StartCoroutine(SmoothJump());
+        }
+    }
+
+    protected virtual void HandlePlayerTarget()
+    {
+        UpdateDestination();
+
+        float distance = Vector3.Distance(transform.position, _currentTarget.position);
+        if (distance >= _vanishDistance)
+            PlayerLost();
+        else if (distance <= _attackDistance)
+            AttackThePlayer();
+        else
+            _timeWithoutSeeingPlayer = 0;
+    }
+
     private void UpdateDestination()
     {
+        if (_currentTarget == null || _spaceshipTarget == null)
+            return;
+
         if (_currentTarget != null)
         {
             Vector3 targetPos = _currentTarget.position;
@@ -75,86 +112,76 @@ public class EnemyController : MonoBehaviour, IDamagable
         }
     }
 
-    private void ListenThePlayer(Transform pPosition)
+    protected virtual void ListenThePlayer(Transform pPosition)
     {
         float distance = Vector3.Distance(transform.position, pPosition.position);
 
         if (distance <= _listeningRange)
         {
-            _currentTarget = pPosition;
+            _playerTarget = pPosition;
+            _currentTarget = _playerTarget;
         }
     }
 
-    private void Update()
+    protected virtual void HandleSpaceshipTarget()
     {
-        if (_currentTarget != _spaceshipTarget)
+        Vector3 targetPos = _spaceshipTarget.position;
+        if (_spaceshipCollider != null)
+            targetPos = _spaceshipCollider.ClosestPoint(transform.position);
+
+        NavMeshPath virtualPath = new NavMeshPath();
+        NavMesh.CalculatePath(transform.position, targetPos, NavMesh.AllAreas, virtualPath);
+
+        float straightDistance = Vector3.Distance(transform.position, targetPos);
+        float walkingDistance = CalculatePathLength(virtualPath);
+
+        bool isPathBlocked = virtualPath.status == NavMeshPathStatus.PathPartial;
+        bool isDetourTooLong = walkingDistance > (straightDistance * _maxDetourMultiplier);
+
+        Vector3 dirToSpaceship = (targetPos - transform.position).normalized;
+        dirToSpaceship.y = 0;
+
+        Vector3 rayOrigin = transform.position + Vector3.up * 1f;
+        bool isWallInFront = Physics.Raycast(rayOrigin, dirToSpaceship, _attackDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+
+        if (isPathBlocked || isDetourTooLong)
         {
-            UpdateDestination();
-
-            float distance = Vector3.Distance(transform.position, _currentTarget.position);
-            if (distance >= _vanishDistance)
-                PlayerLost();
-            else if (distance <= _attackDistance)
-                AttackThePlayer();
-            else
-                _timeWithoutSeeingPlayer = 0;
-        }
-        else
-        {
-            Vector3 targetPos = _spaceshipTarget.position;
-            if (_spaceshipCollider != null)
-                targetPos = _spaceshipCollider.ClosestPoint(transform.position);
-
-            NavMeshPath virtualPath = new NavMeshPath();
-            NavMesh.CalculatePath(transform.position, targetPos, NavMesh.AllAreas, virtualPath);
-
-            float straightDistance = Vector3.Distance(transform.position, targetPos);
-            float walkingDistance = CalculatePathLength(virtualPath);
-
-            bool isPathBlocked = virtualPath.status == NavMeshPathStatus.PathPartial;
-            bool isDetourTooLong = walkingDistance > (straightDistance * _maxDetourMultiplier);
-
-            Vector3 dirToSpaceship = (targetPos - transform.position).normalized;
-            dirToSpaceship.y = 0;
-
-            Vector3 rayOrigin = transform.position + Vector3.up * 1f;
-            bool isWallInFront = Physics.Raycast(rayOrigin, dirToSpaceship, _attackDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-
-            if (isPathBlocked || isDetourTooLong)
+            NavMeshHit navHit;
+            if (NavMesh.Raycast(transform.position, targetPos, out navHit, NavMesh.AllAreas))
             {
-                NavMeshHit navHit;
-                if (NavMesh.Raycast(transform.position, targetPos, out navHit, NavMesh.AllAreas))
-                {
-                    _navAgent.SetDestination(navHit.position);
-                }
+                _navAgent.SetDestination(navHit.position);
+            }
 
-                if (dirToSpaceship != Vector3.zero)
-                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dirToSpaceship), Time.deltaTime * 5f);
+            if (dirToSpaceship != Vector3.zero)
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dirToSpaceship), Time.deltaTime * 5f);
 
-                if (isWallInFront)
-                {
-                    _navAgent.isStopped = true;
-                    TryAttackObstacle();
-                }
-                else
-                {
-                    _navAgent.isStopped = false;
-                }
+            if (isWallInFront)
+            {
+                _navAgent.isStopped = true;
+                TryAttackObstacle();
             }
             else
             {
-                _navAgent.SetDestination(targetPos);
                 _navAgent.isStopped = false;
             }
         }
-
-        if (_navAgent.isOnOffMeshLink && !isJumping)
+        else
         {
-            StartCoroutine(SmoothJump());
+            _navAgent.SetDestination(targetPos);
+
+            if (straightDistance <= _attackDistance)
+            {
+                _navAgent.isStopped = true;
+                TryAttackObstacle();
+            }
+            else
+            {
+                _navAgent.isStopped = false;
+            }
         }
     }
 
-    private void AttackThePlayer()
+    protected virtual void AttackThePlayer()
     {
         _timeWithoutSeeingPlayer = 0f;
         _timeSinceLastAttack += Time.deltaTime;
@@ -184,24 +211,22 @@ public class EnemyController : MonoBehaviour, IDamagable
         }
     }
 
-    private void TryAttackObstacle()
+    protected virtual void TryAttackObstacle()
     {
         _timeSinceLastAttack += Time.deltaTime;
 
         if (_timeSinceLastAttack >= _cooldown)
         {
-            Vector3 targetPos = _spaceshipTarget.position;
-            if (_spaceshipCollider != null)
+            Vector3 targetPos = _currentTarget.position;
+
+            if (_currentTarget == _spaceshipTarget && _spaceshipCollider != null)
                 targetPos = _spaceshipCollider.ClosestPoint(transform.position);
 
             Vector3 origin = transform.position + Vector3.up * 1f;
+            Vector3 dirToTarget = (targetPos - transform.position).normalized;
+            dirToTarget.y = 0;
 
-            Vector3 dirToSpaceship = (targetPos - transform.position).normalized;
-            dirToSpaceship.y = 0;
-
-            Debug.DrawRay(origin, dirToSpaceship * _attackDistance, Color.red, 2f);
-
-            if (Physics.Raycast(origin, dirToSpaceship, out RaycastHit hit, _attackDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            if (Physics.Raycast(origin, dirToTarget, out RaycastHit hit, _attackDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 IDamagable obstacle = hit.collider.GetComponentInParent<IDamagable>();
 

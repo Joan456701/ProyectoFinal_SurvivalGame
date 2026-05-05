@@ -10,4 +10,7 @@ public class BuildingPieceSO : ScriptableObject
 
     public int whith = 1;
     public int hieght = 1;
+
+    [Header("Costes de Construcción")]
+    public BuildRequirement[] requirements;
 }

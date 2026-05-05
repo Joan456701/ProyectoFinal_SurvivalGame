@@ -86,7 +86,12 @@ public class FirstPersonBuilder : MonoBehaviour
                     }
 
                     if (!fatherFloor.HasEdgeObject(currentEdge))
-                        fatherFloor.PlaceEdge(currentEdge, _currentWallBuilding);
+                    {
+                        if (CheckAndConsumeRequirements(_currentWallBuilding.requirements))
+                        {
+                            fatherFloor.PlaceEdge(currentEdge, _currentWallBuilding);
+                        }
+                    }
                 }
             }
         }
@@ -103,7 +108,12 @@ public class FirstPersonBuilder : MonoBehaviour
                     _ghostObject.rotation, _obstacleLayer);
 
                 if (!isSpaceOccupied)
-                    Instantiate(_currentLooseBuilding.prefab, hitInfo.point, Quaternion.Euler(0, _looseObjectRotation,0));
+                {
+                    if (CheckAndConsumeRequirements(_currentLooseBuilding.requirements))
+                    {
+                        Instantiate(_currentLooseBuilding.prefab, hitInfo.point, Quaternion.Euler(0, _looseObjectRotation, 0));
+                    }
+                }
             }
         }
         else
@@ -127,8 +137,12 @@ public class FirstPersonBuilder : MonoBehaviour
                     //Comprobamos si hay algun objeto en esa casilla que nos bloquee la construccion
                     if (!Physics.CheckBox(centerPosition, _cellSizeDimension / 2, Quaternion.identity, _obstacleLayer))
                     {
-                        Transform builtObject = Instantiate(_currentBuilding.prefab, buildPosition, Quaternion.identity);
-                        gridObject.SetPlacedObject(builtObject);
+                        // Comprobamos y cobramos los materiales del Suelo
+                        if (CheckAndConsumeRequirements(_currentBuilding.requirements))
+                        {
+                            Transform builtObject = Instantiate(_currentBuilding.prefab, buildPosition, Quaternion.identity);
+                            gridObject.SetPlacedObject(builtObject);
+                        }
                     }
                     else
                         Debug.Log("Hay un obstaculo en la casilla");
@@ -310,6 +324,32 @@ public class FirstPersonBuilder : MonoBehaviour
         }
     }
 
+    private bool CheckAndConsumeRequirements(BuildRequirement[] requirements)
+    {
+        if (requirements == null || requirements.Length == 0)
+            return true;
+
+        SceneInventoryController inventory = SceneInventoryController.Instance;
+        if (inventory == null)
+            return false;
+
+        for (int i = 0; i < requirements.Length; i++)
+        {
+            if (!inventory.HasItem(requirements[i].itemId, requirements[i].amount))
+            {
+                Debug.Log("Faltan materiales. Necesitas más: " + requirements[i].itemId);
+                return false;
+            }
+        }
+
+        var itemsToConsume = new (string itemID, int amount)[requirements.Length];
+        for (int i = 0; i < requirements.Length; i++)
+        {
+            itemsToConsume[i] = (requirements[i].itemId, requirements[i].amount);
+        }
+
+        return inventory.ConsumeItems(itemsToConsume);
+    }
     private void OnDrawGizmos()
     {
         if (_looseMode && _ghostObject != null && _currentLooseBuilding != null && _ghostObject.gameObject.activeInHierarchy)

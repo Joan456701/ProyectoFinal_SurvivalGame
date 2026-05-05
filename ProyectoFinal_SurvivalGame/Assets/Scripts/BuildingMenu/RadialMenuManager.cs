@@ -1,8 +1,7 @@
 using System.Collections.Generic;
-using Unity.Mathematics;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.UI;
+using TMPro;
 public class RadialMenuManager : MonoBehaviour
 {
     [Header("Referencias")]
@@ -23,10 +22,17 @@ public class RadialMenuManager : MonoBehaviour
     private RadialMenuSO _currentMenu;
     private int _selectedIndex;
 
+    [SerializeField] private Image _aimCursor;
+    [SerializeField] private TMP_Text _centralCostText;
+    [SerializeField] private Image _centralMaterialIcon;
+
     private void Start()
     {
         _pInputHandler = FindFirstObjectByType<PlayerInputHandler>();
         isMenuActive = false;
+
+        _centralCostText.gameObject.SetActive(false);
+        _centralMaterialIcon.gameObject.SetActive(false);
     }
     private void Update()
     {
@@ -63,6 +69,7 @@ public class RadialMenuManager : MonoBehaviour
     public void OpenMenu()
     {
         isMenuActive = true;
+        _aimCursor.gameObject.SetActive(false);
 
         menuContainer.gameObject.SetActive(true);
         _currentMenu = mainMenu;
@@ -78,6 +85,7 @@ public class RadialMenuManager : MonoBehaviour
     public void CloseMenu()
     {
         isMenuActive = false;
+        _aimCursor.gameObject.SetActive(true);
 
         menuContainer.gameObject.SetActive (false);
         
@@ -103,6 +111,7 @@ public class RadialMenuManager : MonoBehaviour
 
         for (int i = 0; i < _currentMenu.elements.Length; i++)
         {
+            RadialMenuElement elementSO = _currentMenu.elements[i];
             RadialMenuPiece newPiece = Instantiate(_piecePrefab, menuContainer);
             _spawnedPieces.Add(newPiece);
 
@@ -110,17 +119,57 @@ public class RadialMenuManager : MonoBehaviour
             newPiece.backgroundImage.color = normalColor;
 
             newPiece.transform.localRotation = Quaternion.Euler(0, 0, (i * -stepLength) + (stepLength / 2f));
-            newPiece.iconImage.sprite = _currentMenu.elements[i].icon;
+            newPiece.iconImage.sprite = elementSO.icon;
 
             float iconDistance = newPiece.iconImage.rectTransform.anchoredPosition.y;
-
             Vector3 centeredPosition = Quaternion.Euler(0, 0, -stepLength / 2f) * new Vector3(0, iconDistance, 0);
 
             newPiece.iconImage.rectTransform.anchoredPosition = centeredPosition;
             newPiece.iconImage.transform.rotation = Quaternion.identity;
         }
+
+        ClearCentralCostUI();
     }
 
+    private void UpdateCentralCostUI(RadialMenuElement elementSO)
+    {
+        if (_centralCostText == null || _centralMaterialIcon == null) return;
+
+        BuildRequirement[] reqs = null;
+        if (elementSO.isWallType && elementSO.wallPieceToBuild != null)
+            reqs = elementSO.wallPieceToBuild.requirements;
+        else if (elementSO.isLooseObject && elementSO.loosePieceToBuild != null)
+            reqs = elementSO.loosePieceToBuild.requirements;
+        else if (!elementSO.isWallType && !elementSO.isLooseObject && elementSO.floorPieceToBuild != null)
+            reqs = elementSO.floorPieceToBuild.requirements;
+
+        if (elementSO.nextMenu != null || reqs == null || reqs.Length == 0)
+        {
+            ClearCentralCostUI();
+            return;
+        }
+
+        BuildRequirement mainReq = reqs[0];
+        SceneInventoryController inventory = SceneInventoryController.Instance;
+
+        _centralCostText.gameObject.SetActive(true);
+        _centralMaterialIcon.gameObject.SetActive(true);
+
+        if (inventory != null)
+        {
+            bool canAfford = inventory.HasItem(mainReq.itemId, mainReq.amount);
+            _centralCostText.text = inventory.GetTotalItemAmount(mainReq.itemId).ToString() + " / " + mainReq.amount.ToString();
+            _centralCostText.color = canAfford ? Color.white : Color.red;
+        }
+
+        _centralMaterialIcon.sprite = elementSO.materialRequired;
+    }
+
+    private void ClearCentralCostUI()
+    {
+        if (_centralCostText != null) _centralCostText.gameObject.SetActive(false);
+        if (_centralMaterialIcon != null) _centralMaterialIcon.gameObject.SetActive(false);
+    }
     private void ClearMenuElements()
     {
         foreach (var piece in _spawnedPieces)
@@ -168,7 +217,15 @@ public class RadialMenuManager : MonoBehaviour
         _selectedIndex = newIndex;
 
         if (_selectedIndex != -1)
+        {
             _spawnedPieces[_selectedIndex].backgroundImage.color = highlightColor;
+
+            UpdateCentralCostUI(_currentMenu.elements[_selectedIndex]);
+        }
+        else
+        {
+            ClearCentralCostUI();
+        }
     }
 
     private void ExecuteAction(RadialMenuElement selectedElement)

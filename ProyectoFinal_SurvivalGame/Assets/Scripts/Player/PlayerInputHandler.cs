@@ -5,6 +5,11 @@ public class PlayerInputHandler : MonoBehaviour
 {
     private PlayerInput _playerControls;
     private bool _controlsInitialized;
+    private bool _interactConsumed;
+    private bool _dropConsumed;
+    private bool _dropAllConsumed;
+    private bool _dropOneConsumed;
+    private bool _dropHalfConsumed;
 
     public Vector2 movementInput { get; private set; }
     public Vector2 rotationInput { get; private set; }
@@ -37,6 +42,59 @@ public class PlayerInputHandler : MonoBehaviour
     public bool submitTriggered;
     public bool cancelTriggered;
     public Vector2 mousePosition;
+    public bool pauseTriggered;
+    public bool ConsumeInventoryToggle()
+    {
+        if (!inventoryTriggered)
+        {
+            return false;
+        }
+
+        inventoryTriggered = false;
+        return true;
+    }
+
+    public bool ConsumeInteractTrigger()
+    {
+        if (!interactTriggered || _interactConsumed)
+        {
+            return false;
+        }
+
+        _interactConsumed = true;
+        return true;
+    }
+
+    public bool ConsumeDropTrigger()
+    {
+        return ConsumeHeldTrigger(dropTriggered, ref _dropConsumed);
+    }
+
+    public bool ConsumeDropAllTrigger()
+    {
+        return ConsumeHeldTrigger(dropAllTriggered, ref _dropAllConsumed);
+    }
+
+    public bool ConsumeDropOneTrigger()
+    {
+        return ConsumeHeldTrigger(dropOneTriggered, ref _dropOneConsumed);
+    }
+
+    public bool ConsumeDropHalfTrigger()
+    {
+        return ConsumeHeldTrigger(dropHalfTriggered, ref _dropHalfConsumed);
+    }
+
+    private bool ConsumeHeldTrigger(bool isTriggered, ref bool consumed)
+    {
+        if (!isTriggered || consumed)
+        {
+            return false;
+        }
+
+        consumed = true;
+        return true;
+    }
 
     private void Awake()
     {
@@ -80,8 +138,16 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.Player.Sprint.canceled += inputInfo => sprintTriggered = false;
 
         // --- Interactuar ---
-        _playerControls.Player.Interact.performed += inputInfo => interactTriggered = true;
-        _playerControls.Player.Interact.canceled += inputInfo => interactTriggered = false;
+        _playerControls.Player.Interact.performed += inputInfo =>
+        {
+            interactTriggered = true;
+            _interactConsumed = false;
+        };
+        _playerControls.Player.Interact.canceled += inputInfo =>
+        {
+            interactTriggered = false;
+            _interactConsumed = false;
+        };
 
         // --- Attack ---
         _playerControls.Player.Attack.performed += inputInfo => attackTiggered = true;
@@ -123,20 +189,52 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.Player.Subdivide.canceled += inputInfo => subdivideTriggered = false;
 
         // --- Drop Objects ---
-        _playerControls.Player.Drop.performed += inputInfo => dropTriggered = true;
-        _playerControls.Player.Drop.canceled += inputInfo => dropTriggered = false;
+        _playerControls.Player.Drop.performed += inputInfo =>
+        {
+            dropTriggered = true;
+            _dropConsumed = false;
+        };
+        _playerControls.Player.Drop.canceled += inputInfo =>
+        {
+            dropTriggered = false;
+            _dropConsumed = false;
+        };
 
         // --- DropAll Objects ---
-        _playerControls.Player.DropAll.performed += inputInfo => dropAllTriggered = true;
-        _playerControls.Player.DropAll.canceled += inputInfo => dropAllTriggered = false;
+        _playerControls.Player.DropAll.performed += inputInfo =>
+        {
+            dropAllTriggered = true;
+            _dropAllConsumed = false;
+        };
+        _playerControls.Player.DropAll.canceled += inputInfo =>
+        {
+            dropAllTriggered = false;
+            _dropAllConsumed = false;
+        };
 
         // --- DropOne Objects ---
-        _playerControls.Player.DropOne.performed += inputInfo => dropOneTriggered = true;
-        _playerControls.Player.DropOne.canceled += inputInfo => dropOneTriggered = false;
+        _playerControls.Player.DropOne.performed += inputInfo =>
+        {
+            dropOneTriggered = true;
+            _dropOneConsumed = false;
+        };
+        _playerControls.Player.DropOne.canceled += inputInfo =>
+        {
+            dropOneTriggered = false;
+            _dropOneConsumed = false;
+        };
 
         // --- DropHalf Objects ---
-        _playerControls.Player.DropHalf.performed += inputInfo => dropHalfTriggered = true;
-        _playerControls.Player.DropHalf.canceled += inputInfo => dropHalfTriggered = false;
+        _playerControls.Player.DropHalf.performed += inputInfo =>
+        {
+            dropHalfTriggered = true;
+            _dropHalfConsumed = false;
+        };
+        _playerControls.Player.DropHalf.canceled += inputInfo =>
+        {
+            dropHalfTriggered = false;
+            _dropHalfConsumed = false;
+        };
 
         // --- Eat Objects ---
         _playerControls.Player.Eat.performed += inputInfo => eatTriggered = true;
@@ -171,6 +269,10 @@ public class PlayerInputHandler : MonoBehaviour
         _playerControls.PlayerUI.Point.performed += inputInfo => mousePosition = inputInfo.ReadValue<Vector2>();
         _playerControls.PlayerUI.Point.canceled += inputInfo => mousePosition = Vector2.zero;
 
+        // --- Pause Button ---
+        _playerControls.PlayerUI.Pause.performed += inputInfo => pauseTriggered = true;
+        _playerControls.PlayerUI.Pause.canceled += inputInfo => pauseTriggered = false;
+    
         _controlsInitialized = true;
     }
 

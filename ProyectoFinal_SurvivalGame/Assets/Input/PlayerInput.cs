@@ -672,6 +672,15 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Pause"",
+                    ""type"": ""Button"",
+                    ""id"": ""5e46bbef-a60a-4331-8ff5-b72fbdf7b405"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -718,6 +727,17 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
                     ""action"": ""Point"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""060b4401-3890-4353-88e3-0995b815d8da"",
+                    ""path"": ""<Keyboard>/escape"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Pause"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -755,6 +775,7 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
         m_PlayerUI_InteractUI = m_PlayerUI.FindAction("InteractUI", throwIfNotFound: true);
         m_PlayerUI_CancelInteract = m_PlayerUI.FindAction("CancelInteract", throwIfNotFound: true);
         m_PlayerUI_Point = m_PlayerUI.FindAction("Point", throwIfNotFound: true);
+        m_PlayerUI_Pause = m_PlayerUI.FindAction("Pause", throwIfNotFound: true);
     }
 
     ~@PlayerInput()
@@ -1188,6 +1209,7 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
     private readonly InputAction m_PlayerUI_InteractUI;
     private readonly InputAction m_PlayerUI_CancelInteract;
     private readonly InputAction m_PlayerUI_Point;
+    private readonly InputAction m_PlayerUI_Pause;
     /// <summary>
     /// Provides access to input actions defined in input action map "PlayerUI".
     /// </summary>
@@ -1211,6 +1233,10 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "PlayerUI/Point".
         /// </summary>
         public InputAction @Point => m_Wrapper.m_PlayerUI_Point;
+        /// <summary>
+        /// Provides access to the underlying input action "PlayerUI/Pause".
+        /// </summary>
+        public InputAction @Pause => m_Wrapper.m_PlayerUI_Pause;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1246,6 +1272,9 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
             @Point.started += instance.OnPoint;
             @Point.performed += instance.OnPoint;
             @Point.canceled += instance.OnPoint;
+            @Pause.started += instance.OnPause;
+            @Pause.performed += instance.OnPause;
+            @Pause.canceled += instance.OnPause;
         }
 
         /// <summary>
@@ -1266,6 +1295,9 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
             @Point.started -= instance.OnPoint;
             @Point.performed -= instance.OnPoint;
             @Point.canceled -= instance.OnPoint;
+            @Pause.started -= instance.OnPause;
+            @Pause.performed -= instance.OnPause;
+            @Pause.canceled -= instance.OnPause;
         }
 
         /// <summary>
@@ -1503,5 +1535,12 @@ public partial class @PlayerInput: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnPoint(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Pause" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnPause(InputAction.CallbackContext context);
     }
 }

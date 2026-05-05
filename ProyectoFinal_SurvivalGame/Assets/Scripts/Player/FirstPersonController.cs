@@ -28,7 +28,6 @@ public class FirstPersonController : MonoBehaviour, IDamagable
     [SerializeField] private Camera _mainCamera;
 
     [Header("Death Settings")]
-    [SerializeField] private GameObject _deathScreen;
     [SerializeField] private float _playerHealth = 100f;
     [SerializeField] private float _maxPlayerHealth = 100f;
 
@@ -62,7 +61,7 @@ public class FirstPersonController : MonoBehaviour, IDamagable
 
         UpdatePickupPrompt();
 
-        if (_pInputHandler.interactTriggered)
+        if (_pInputHandler.ConsumeInteractTrigger())
         {
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
@@ -75,6 +74,13 @@ public class FirstPersonController : MonoBehaviour, IDamagable
                 if (pickupItem != null)
                 {
                     pickupItem.TryPickup(_inventoryController);
+                    return;
+                }
+
+                IWorldInteractable worldInteractable = hitInfo.collider.GetComponent<IWorldInteractable>();
+                if (worldInteractable != null)
+                {
+                    worldInteractable.TryInteract(_inventoryController);
                 }
             }
         }
@@ -130,6 +136,13 @@ public class FirstPersonController : MonoBehaviour, IDamagable
             if (pickupItem != null)
             {
                 _inventoryController.SetPickupPrompt(true, pickupItem.GetPickupPrompt());
+                return;
+            }
+
+            IWorldInteractable worldInteractable = pickupHitInfo.collider.GetComponent<IWorldInteractable>();
+            if (worldInteractable != null)
+            {
+                _inventoryController.SetPickupPrompt(true, worldInteractable.GetInteractionPrompt());
                 return;
             }
         }
@@ -204,15 +217,7 @@ public class FirstPersonController : MonoBehaviour, IDamagable
         if (_playerHealth <= 0)
         {
             _playerHealth = 0;
-            if (_deathScreen != null)
-            {
-                _deathScreen.SetActive(true);
-                enabled = false;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                Debug.Log("El jugador ha muerto");
-                Debug.Log("JUEGO TERMINADO - Has muerto");
-            }
+            GameStateManager.Instance.ChangeGameState(GameState.StateType.OVER);
         }
     }
 

@@ -14,3 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FloorEdgeObjectTypeSO
   prefab: {fileID: 1570065366218377110, guid: 0fda9d88214b233478ad91d3ce52d182, type: 3}
   ghostPrefab: {fileID: 1570065366218377110, guid: a436feb50c3073b4eb739f41db22d27f, type: 3}
+  isStairs: 0
+  requirements: []

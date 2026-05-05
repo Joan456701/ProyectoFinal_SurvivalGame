@@ -1,19 +1,26 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CentryController : MonoBehaviour
+public class CentryController : MonoBehaviour, IDamagable
 {
     [Header("Referencias")]
     [SerializeField] private GameObject _proyectile;
     [SerializeField] private Transform _centryRotation;
     [SerializeField] private Transform _bulletsPivot;
-    [SerializeField] private Transform _raycasrPivot;
+    [SerializeField] private Transform _raycastPivot;
     private BoxCollider _centryCollider;
 
     [Header("Disparo")]
     [SerializeField] private float _fireRate = 0.5f;
     [SerializeField] private float _bulletSpeed = 100f;
     private float _timeSinceLastShot = 0f;
+
+    [SerializeField] private float _targetSearchRate = 0.25f;
+    private float _timeSinceLastSearch = 0f;
+
+    [Header("Vida de la torreta")]
+    [SerializeField] private int _maxHealth;
+    private int _currentHealth;
 
     private GameObject actualObjective;
 
@@ -22,14 +29,16 @@ public class CentryController : MonoBehaviour
     private void Start()
     {
         _centryCollider = GetComponent<BoxCollider>();
+
+        _currentHealth = _maxHealth;
     }
 
     private void OnTriggerEnter(Collider other)
     {
         EnemyController enemy = other.GetComponent<EnemyController>();
-        if (enemy != null)
-        { 
-            _enemiesList.Add(other.gameObject); 
+        if (enemy != null && !_enemiesList.Contains(other.gameObject))
+        {
+            _enemiesList.Add(other.gameObject);
         }
     }
 
@@ -47,50 +56,74 @@ public class CentryController : MonoBehaviour
 
     private void Update()
     {
-        _enemiesList.RemoveAll(e => e == null);
-
-        if (_enemiesList.Count > 0)
+        _timeSinceLastSearch += Time.deltaTime;
+        if (_timeSinceLastSearch >= _targetSearchRate)
         {
-            if (actualObjective != null)
-            {
-                Vector3 rayOrigin = _raycasrPivot.transform.position;
-                Vector3 rayDirection = actualObjective.transform.position - rayOrigin;
+            FindBestTarget();
+            _timeSinceLastSearch = 0f;
+        }
 
-                if (Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit))
+        if (actualObjective != null)
+        {
+            PointAndShoot(actualObjective);
+        }
+    }
+
+    private void FindBestTarget()
+    {
+        for (int i = _enemiesList.Count - 1; i >= 0; i--)
+        {
+            if (_enemiesList[i] == null || !_enemiesList[i].activeInHierarchy)
+            {
+                if (actualObjective == _enemiesList[i]) actualObjective = null;
+                _enemiesList.RemoveAt(i);
+            }
+        }
+
+        if (_enemiesList.Count == 0) return;
+
+        if (actualObjective != null)
+        {
+            Vector3 rayOrigin = _raycastPivot.position;
+            Vector3 rayDirection = actualObjective.transform.position - rayOrigin;
+
+            if (Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit))
+            {
+                if (hit.collider.gameObject != actualObjective)
                 {
-                    if (hit.collider.gameObject != actualObjective)
-                        actualObjective = null;
+                    actualObjective = null;
+                }
+                else
+                {
+                    return;
                 }
             }
-            if (actualObjective == null && _enemiesList.Count > 0)
+        }
+
+        GameObject closestEnemy = null;
+        float closestDistance = Mathf.Infinity;
+        Vector3 origin = _raycastPivot.position;
+
+        for (int i = 0; i < _enemiesList.Count; i++)
+        {
+            Vector3 enemyPosition = _enemiesList[i].transform.position;
+            float distance = Vector3.Distance(origin, enemyPosition);
+
+            if (distance < closestDistance)
             {
-                GameObject closestEnemy = null;
-                float closestDistance = Mathf.Infinity;
-
-                for (int i = 0; i < _enemiesList.Count; i++)
+                Vector3 direction = enemyPosition - origin;
+                if (Physics.Raycast(origin, direction, out RaycastHit hit))
                 {
-                    Vector3 origin = _raycasrPivot.transform.position;
-                    Vector3 enemyPosition = _enemiesList[i].transform.position;
-                    Vector3 direction = enemyPosition - origin;
-
-                    if (Physics.Raycast(origin, direction, out RaycastHit hit))
+                    if (hit.collider.gameObject == _enemiesList[i])
                     {
-                        if (hit.collider.gameObject == _enemiesList[i])
-                        {
-                            float distance = Vector3.Distance(origin, enemyPosition);
-                            if (distance < closestDistance)
-                            {
-                                closestDistance = distance;
-                                closestEnemy = _enemiesList[i];
-                            }
-                        }   
+                        closestDistance = distance;
+                        closestEnemy = _enemiesList[i];
                     }
                 }
-                actualObjective = closestEnemy;
             }
-            if (actualObjective != null)
-                PointAndShoot(actualObjective);
         }
+
+        actualObjective = closestEnemy;
     }
 
     private void PointAndShoot(GameObject objective)
@@ -105,16 +138,14 @@ public class CentryController : MonoBehaviour
         }
 
         _timeSinceLastShot += Time.deltaTime;
-
         if (_timeSinceLastShot >= _fireRate)
         {
             GameObject newBullet = Instantiate(_proyectile, _bulletsPivot.position, _bulletsPivot.rotation);
 
             Collider bulletCollider = newBullet.GetComponent<Collider>();
-            if (bulletCollider != null)
+            if (bulletCollider != null && _centryCollider != null)
             {
-                if (_centryCollider != null)
-                    Physics.IgnoreCollision(bulletCollider, _centryCollider);
+                Physics.IgnoreCollision(bulletCollider, _centryCollider);
             }
 
             Rigidbody bulletRb = newBullet.GetComponent<Rigidbody>();
@@ -124,5 +155,13 @@ public class CentryController : MonoBehaviour
             Destroy(newBullet, 3f);
             _timeSinceLastShot = 0f;
         }
+    }
+
+    public void DamageRecived(int damage)
+    {
+        _currentHealth -= damage;
+
+        if (_currentHealth <= 0)
+            Destroy(gameObject);
     }
 }

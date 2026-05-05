@@ -17,4 +17,5 @@ public class RadialMenuElement : ScriptableObject
     public bool isStairs;
     public bool isLooseObject;
 
+    public Sprite materialRequired;
 }

@@ -267,9 +267,10 @@ MonoBehaviour:
   _proyectile: {fileID: 7889488404639355196, guid: 523ab0c80433a4f45990d1855f911efe, type: 3}
   _centryRotation: {fileID: 1728304000034546034}
   _bulletsPivot: {fileID: 5930139486965693469}
-  _raycasrPivot: {fileID: 627457797517852350}
+  _raycastPivot: {fileID: 627457797517852350}
   _fireRate: 0.5
   _bulletSpeed: 100
+  _targetSearchRate: 0.25
 --- !u!54 &7513067301333676587
 Rigidbody:
   m_ObjectHideFlags: 0

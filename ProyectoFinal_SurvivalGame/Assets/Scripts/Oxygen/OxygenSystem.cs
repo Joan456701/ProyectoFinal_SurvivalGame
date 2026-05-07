@@ -121,6 +121,19 @@ public class OxygenSystem : MonoBehaviour
         _isPaused = paused;
     }
 
+    public void SetTankAvailable(bool hasTank)
+    {
+        _hasOxygenTank = hasTank;
+
+        if (!_hasOxygenTank)
+        {
+            _currentOxygenTime = 0f;
+            _isTakingOxygenDamage = true;
+        }
+
+        UpdateOxygenUI();
+    }
+
     public void ConsumeOxygen(float amount)
     {
         if (_hasOxygenTank && !_isPaused)

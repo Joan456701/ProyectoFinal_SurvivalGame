@@ -6,6 +6,11 @@ public class GasoilStation : MonoBehaviour, IWorldInteractable
     [Header("Settings")]
     [SerializeField] private int _carbonCost = 1;
 
+    private void Awake()
+    {
+        ShipStatusSystem.GetOrCreate();
+    }
+
     public bool TryInteract(SceneInventoryController inventoryController)
     {
         if (inventoryController == null)
@@ -17,27 +22,26 @@ public class GasoilStation : MonoBehaviour, IWorldInteractable
             return false;
         }
 
-        if (OxygenSystem.Instance == null)
+        ShipStatusSystem shipStatusSystem = ShipStatusSystem.GetOrCreate();
+        if (Mathf.Approximately(shipStatusSystem.CurrentShipEnergy, shipStatusSystem.MaxShipEnergy))
         {
-            Debug.Log("Sistema de oxigeno no encontrado");
+            Debug.Log("La energia de la nave ya esta llena");
             return false;
         }
 
-        OxygenSystem.Instance.RefillOxygen();
-        inventoryController.ConsumeItem("carbon", _carbonCost);
-        Debug.Log("Has rellenado la gasolina usando carbon");
+        if (!inventoryController.ConsumeItem("carbon", _carbonCost))
+        {
+            Debug.Log("No se pudo consumir el carbon para rellenar la energia");
+            return false;
+        }
+
+        shipStatusSystem.RefillEnergy();
+        Debug.Log("Has rellenado la energia de la nave usando carbon");
         return true;
     }
 
     public string GetInteractionPrompt()
     {
-        if (OxygenSystem.Instance != null && 
-            OxygenSystem.Instance.HasOxygenTank && 
-            Mathf.Approximately(OxygenSystem.Instance.CurrentOxygenTime, OxygenSystem.Instance.MaxOxygenTime))
-        {
-            return "La gasolina ya esta llena";
-        }
-
         SceneInventoryController inv = SceneInventoryController.Instance;
         if (inv == null)
             return "Necesitas carbon para rellenar";
@@ -45,6 +49,12 @@ public class GasoilStation : MonoBehaviour, IWorldInteractable
         if (!inv.HasItem("carbon", _carbonCost))
             return "Necesitas carbon para rellenar";
 
-        return "Pulsar E para rellenar gasolina";
+        ShipStatusSystem shipStatusSystem = ShipStatusSystem.Instance;
+        if (shipStatusSystem != null && Mathf.Approximately(shipStatusSystem.CurrentShipEnergy, shipStatusSystem.MaxShipEnergy))
+        {
+            return "La energia de la nave ya esta llena";
+        }
+
+        return "Pulsar E para rellenar energia de la nave";
     }
 }

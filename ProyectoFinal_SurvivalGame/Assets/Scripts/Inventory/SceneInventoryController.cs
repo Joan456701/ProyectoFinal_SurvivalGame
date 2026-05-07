@@ -1,106 +1,17 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class SceneInventoryController : MonoBehaviour
 {
     private const string GeneratedUiRootName = "GeneratedInventoryUI";
-
-    [Serializable]
-    private class InventoryItemDefinition
-    {
-        public string itemId;
-        public string displayName;
-        [TextArea] public string description;
-        public Color color = Color.white;
-        [Min(1)] public int maxStack = 20;
-        public PrimitiveType worldPrimitiveType = PrimitiveType.Cube;
-        public Vector3 worldScale = Vector3.one;
-    }
-
-    [Serializable]
-    private class InventorySlot
-    {
-        public InventoryItemDefinition item;
-        public int amount;
-
-        public bool IsEmpty => item == null || amount <= 0;
-
-        public void Clear()
-        {
-            item = null;
-            amount = 0;
-        }
-    }
-
-    [Serializable]
-    private class InventoryState
-    {
-        public string[] itemIds;
-        public int[] amounts;
-        public int activeHotbarSlotIndex;
-    }
-
-    [Serializable]
-    private class RecipeRequirement
-    {
-        public string itemId;
-        public int amount;
-    }
-
-    [Serializable]
-    private class CraftingRecipe
-    {
-        public string resultItemId;
-        public int resultAmount;
-        public List<RecipeRequirement> requirements = new List<RecipeRequirement>();
-    }
-
-    private sealed class SlotUI
-    {
-        public int Index;
-        public Image Background;
-        public Image Icon;
-        public Text AmountLabel;
-        public Text ShortcutLabel;
-    }
-
-    private sealed class CraftingRecipeUI
-    {
-        public CraftingRecipe Recipe;
-        public Text NameLabel;
-        public Text RequirementsLabel;
-        public Text StatusLabel;
-        public Button CreateButton;
-        public Image ButtonImage;
-    }
-
-    private sealed class TransferSlotUI
-    {
-        public int Index;
-        public Image Background;
-        public Image Icon;
-        public Text AmountLabel;
-        public Text Label;
-        public Button Button;
-    }
-
-    private enum ChestTransferContext
-    {
-        None,
-        Inventory,
-        Chest
-    }
+    private const string OxygenTankItemId = "Bombona";
 
     private static SceneInventoryController _instance;
     public static SceneInventoryController Instance => _instance;
 
-    private readonly Stack<InventoryState> _undoStack = new Stack<InventoryState>();
-    private const int MaxUndoHistory = 50;
+    private readonly InventoryUndoHistory _undoHistory = new InventoryUndoHistory(50);
 
     [Header("Scene References")]
     [SerializeField] private PlayerInputHandler _playerInputHandler;
@@ -230,6 +141,7 @@ public class SceneInventoryController : MonoBehaviour
             GameObject canvasInstance = Instantiate(_canvasPrefab);
             canvasInstance.name = "Canvas";
             _generatedUiRoot = canvasInstance.transform.gameObject;
+            EnsureSurvivalVitalsHud(canvasInstance);
 
             SceneInventoryController clonedController = canvasInstance.GetComponent<SceneInventoryController>();
             if (clonedController != null && clonedController != this)
@@ -276,28 +188,16 @@ public class SceneInventoryController : MonoBehaviour
             state.amounts[i] = _slots[i].amount;
         }
 
-        _undoStack.Push(state);
-
-        if (_undoStack.Count > MaxUndoHistory)
-        {
-            InventoryState[] tempArray = _undoStack.ToArray();
-            _undoStack.Clear();
-            for (int i = 1; i < tempArray.Length; i++)
-            {
-                _undoStack.Push(tempArray[i]);
-            }
-        }
+        _undoHistory.Push(state);
     }
 
     private void Undo()
     {
-        if (_undoStack.Count == 0)
+        if (!_undoHistory.TryPop(out InventoryState state))
         {
             Debug.Log("No hay acciones para deshacer");
             return;
         }
-
-        InventoryState state = _undoStack.Pop();
 
         for (int i = 0; i < _slots.Count && i < state.itemIds.Length; i++)
         {
@@ -315,11 +215,12 @@ public class SceneInventoryController : MonoBehaviour
         _activeHotbarSlotIndex = state.activeHotbarSlotIndex;
         _selectedSlotIndex = Mathf.Clamp(_selectedSlotIndex, 0, _slots.Count - 1);
 
+        SynchronizeOxygenTankWithInventory();
         ClearHeldItemVisual();
         RefreshHeldItemFromHotbarSelection();
         RefreshUI();
 
-        Debug.Log("Accion deshecha. Historial restante: " + _undoStack.Count);
+        Debug.Log("Accion deshecha. Historial restante: " + _undoHistory.Count);
     }
 
     private void HandleUndoShortcut()
@@ -397,6 +298,7 @@ public class SceneInventoryController : MonoBehaviour
 
             if (remainingAmount <= 0)
             {
+                SynchronizeOxygenTankWithInventory();
                 RefreshUI();
                 return true;
             }
@@ -416,11 +318,13 @@ public class SceneInventoryController : MonoBehaviour
 
             if (remainingAmount <= 0)
             {
+                SynchronizeOxygenTankWithInventory();
                 RefreshUI();
                 return true;
             }
         }
 
+        SynchronizeOxygenTankWithInventory();
         RefreshUI();
         return false;
     }
@@ -449,6 +353,7 @@ public class SceneInventoryController : MonoBehaviour
             slot.Clear();
         }
 
+        SynchronizeOxygenTankWithInventory();
         ValidateHeldItem();
         RefreshHeldItemFromHotbarSelection();
         RefreshUI();
@@ -892,11 +797,30 @@ public class SceneInventoryController : MonoBehaviour
             return;
         }
 
+        EnsureSurvivalVitalsHud(gameObject);
         _crosshair = transform.Find("Image") != null ? transform.Find("Image").gameObject : null;
 
         if (!TryBindExistingInventoryUI(canvasRect))
         {
             BuildInventoryUI();
+        }
+    }
+
+    private void SynchronizeOxygenTankWithInventory()
+    {
+        if (OxygenSystem.Instance == null)
+        {
+            return;
+        }
+
+        OxygenSystem.Instance.SetTankAvailable(HasItem(OxygenTankItemId, 1));
+    }
+
+    private static void EnsureSurvivalVitalsHud(GameObject canvasObject)
+    {
+        if (canvasObject != null && canvasObject.GetComponent<SurvivalVitalsHUD>() == null)
+        {
+            canvasObject.AddComponent<SurvivalVitalsHUD>();
         }
     }
 
@@ -1582,7 +1506,7 @@ public class SceneInventoryController : MonoBehaviour
 
         if (_heldItemId == selectedSlot.item.itemId)
         {
-            if (selectedSlot.item.itemId == "Bombona")
+            if (selectedSlot.item.itemId == OxygenTankItemId)
             {
                 OxygenSystem.Instance?.SetPaused(true);
             }
@@ -1592,9 +1516,9 @@ public class SceneInventoryController : MonoBehaviour
             return;
         }
 
-        if (selectedSlot.item.itemId == "Bombona")
+        if (selectedSlot.item.itemId == OxygenTankItemId)
         {
-            OxygenSystem.Instance?.GiveOxygenTank();
+            OxygenSystem.Instance?.SetTankAvailable(true);
         }
 
         SaveUndoState();
@@ -1621,13 +1545,6 @@ public class SceneInventoryController : MonoBehaviour
 
         CreateHeldItemVisual(activeSlot.item);
         RefreshUI();
-    }
-
-    private enum DropMode
-    {
-        FullStack,
-        HalfStack,
-        SingleUnit
     }
 
     private void DropFromActiveHotbarStack(DropMode dropMode)
@@ -2622,6 +2539,7 @@ public class SceneInventoryController : MonoBehaviour
             RemoveItemAmount(recipe.requirements[i].itemId, recipe.requirements[i].amount);
         }
 
+        SynchronizeOxygenTankWithInventory();
         ValidateHeldItem();
         TryAddItem(recipe.resultItemId, recipe.resultAmount, false);
         Debug.Log("Has creado " + GetItemDisplayName(recipe.resultItemId));
@@ -2712,6 +2630,7 @@ public class SceneInventoryController : MonoBehaviour
             RemoveItemAmount(items[i].itemId, items[i].amount);
         }
 
+        SynchronizeOxygenTankWithInventory();
         ValidateHeldItem();
         RefreshHeldItemFromHotbarSelection();
         RefreshUI();
@@ -2749,71 +2668,5 @@ public class SceneInventoryController : MonoBehaviour
         rectTransform.anchorMax = anchorMax;
         rectTransform.offsetMin = offsetMin;
         rectTransform.offsetMax = offsetMax;
-    }
-}
-
-public class InventorySlotDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
-{
-    private SceneInventoryController _inventoryController;
-    private int _slotIndex;
-
-    public void Initialize(SceneInventoryController inventoryController, int slotIndex)
-    {
-        _inventoryController = inventoryController;
-        _slotIndex = slotIndex;
-    }
-
-    public void OnBeginDrag(PointerEventData eventData)
-    {
-        _inventoryController?.BeginSlotDrag(_slotIndex);
-    }
-
-    public void OnDrag(PointerEventData eventData)
-    {
-        _inventoryController?.UpdateSlotDrag(eventData.position);
-    }
-
-    public void OnEndDrag(PointerEventData eventData)
-    {
-        _inventoryController?.EndSlotDrag(eventData);
-    }
-
-    public void OnDrop(PointerEventData eventData)
-    {
-        _inventoryController?.HandleSlotDrop(_slotIndex);
-    }
-}
-
-public class ChestTransferSlotDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
-{
-    private SceneInventoryController _inventoryController;
-    private int _slotIndex;
-    private bool _isChestStorage;
-
-    public void Initialize(SceneInventoryController inventoryController, int slotIndex, bool isChestStorage)
-    {
-        _inventoryController = inventoryController;
-        _slotIndex = slotIndex;
-        _isChestStorage = isChestStorage;
-    }
-
-    public void OnBeginDrag(PointerEventData eventData)
-    {
-        _inventoryController?.BeginChestTransferDrag(_isChestStorage, _slotIndex);
-    }
-
-    public void OnDrag(PointerEventData eventData)
-    {
-        _inventoryController?.UpdateSlotDrag(eventData.position);
-    }
-
-    public void OnEndDrag(PointerEventData eventData)
-    {
-        _inventoryController?.EndChestTransferDrag();
-    }
-
-    public void OnDrop(PointerEventData eventData)
-    {
-        _inventoryController?.HandleChestTransferDrop(_isChestStorage, _slotIndex);
     }
 }

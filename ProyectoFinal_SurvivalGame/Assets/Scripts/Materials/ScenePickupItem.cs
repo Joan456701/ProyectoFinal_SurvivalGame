@@ -139,6 +139,14 @@ internal static class ScenePickupNameResolver
             return true;
         }
 
+
+        if (trimmedName.StartsWith("Metal", System.StringComparison.OrdinalIgnoreCase))
+        {
+            itemId = "metal";
+            pickupName = "Metal";
+            return true;
+        }
+
         return false;
     }
 }

@@ -65,7 +65,6 @@ public class FirstPersonController : MonoBehaviour, IDamagable
         {
             Vector3 origin = _mainCamera.transform.position;
             Vector3 direction = _mainCamera.transform.forward;
-            Debug.Log("El jugador ha interactuado");
 
             if (Physics.Raycast(origin, direction, out hitInfo, _raycastDistance))
             {

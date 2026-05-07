@@ -3909,7 +3909,6 @@ MonoBehaviour:
   _pInputHandler: {fileID: 1746522192}
   _rMenuManager: {fileID: 498099395}
   _mainCamera: {fileID: 330585545}
-  _deathScreen: {fileID: 0}
   _playerHealth: 100
   _maxPlayerHealth: 100
   _raycastDistance: 3
@@ -3962,7 +3961,6 @@ MonoBehaviour:
   _oxygenSlider: {fileID: 0}
   _oxygenFillImage: {fileID: 0}
   _oxygenTimerText: {fileID: 0}
-  _deathScreen: {fileID: 0}
   _firstPersonController: {fileID: 293665048}
 --- !u!114 &293665051
 MonoBehaviour:
@@ -14358,8 +14356,8 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 1.0683478
-  m_Center: {x: -0.15140279, y: 0.05555434, z: -0.009041372}
+  m_Radius: 8
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &961320316
 GameObject:
   m_ObjectHideFlags: 0
@@ -25469,6 +25467,7 @@ MonoBehaviour:
   submitTriggered: 0
   cancelTriggered: 0
   mousePosition: {x: 0, y: 0}
+  pauseTriggered: 0
 --- !u!4 &1746522193
 Transform:
   m_ObjectHideFlags: 0
@@ -28953,15 +28952,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 51f7239cc52c12a42ad8c39eb34def6c, type: 3}
       propertyPath: m_LocalScale.x
-      value: 10.734474
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 51f7239cc52c12a42ad8c39eb34def6c, type: 3}
       propertyPath: m_LocalScale.y
-      value: 10.734474
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 51f7239cc52c12a42ad8c39eb34def6c, type: 3}
       propertyPath: m_LocalScale.z
-      value: 10.734474
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 51f7239cc52c12a42ad8c39eb34def6c, type: 3}
       propertyPath: m_LocalPosition.x
